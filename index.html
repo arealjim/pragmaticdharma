@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pragmatic Dharma Resources</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 2rem;
+            text-align: center;
+        }
+        header h1 {
+            font-size: 2.5rem;
+            font-weight: 300;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+        header p {
+            color: #bdc3c7;
+            font-size: 1.1rem;
+        }
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        section {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #3498db;
+            color: #2c3e50;
+        }
+        h3 {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin: 1.5rem 0 0.75rem 0;
+            color: #34495e;
+        }
+        p {
+            margin-bottom: 1rem;
+            color: #555;
+        }
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .resource-link {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            margin: 0.5rem 0;
+            transition: background 0.2s;
+        }
+        .resource-link:hover {
+            background: #2980b9;
+            text-decoration: none;
+        }
+        .image-container {
+            margin: 1.5rem 0;
+            text-align: center;
+        }
+        .image-container img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .image-caption {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 0.5rem;
+            font-style: italic;
+        }
+        .pdf-container {
+            margin: 1.5rem 0;
+        }
+        .pdf-container iframe {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .pdf-fallback {
+            background: #ecf0f1;
+            padding: 1rem;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+        .card {
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 1rem;
+        }
+        .card img {
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Pragmatic Dharma</h1>
+        <p>Meditation Maps & Resources</p>
+    </header>
+
+    <main>
+        <!-- TMI Section -->
+        <section>
+            <h2>The Mind Illuminated</h2>
+            <p>Quick reference guide to Culadasa's 10-stage meditation system from <em>The Mind Illuminated</em>.</p>
+            <a href="https://docs.google.com/spreadsheets/d/1I9i4eIJicQhZRR7-JE6zYUdZ86Up9NoqPQeYTzdsKLE/edit?gid=0#gid=0" target="_blank" class="resource-link">
+                Open TMI Stage Reference (Google Sheets)
+            </a>
+        </section>
+
+        <!-- Mind Maps Section -->
+        <section>
+            <h2>Insight Territory Mind Maps</h2>
+            <p>Visual maps of the insight stages (ñanas) and jhanas by Daniel Ingram.</p>
+
+            <h3>The Ñanas and Jhanas General Map (Pathways)</h3>
+            <div class="image-container">
+                <a href="https://static1.squarespace.com/static/5037f52d84ae1e87f694cfda/t/506fcc5c84aefb9a79a610b3/1349504092518/Pathways.jpg" target="_blank">
+                    <img src="https://static1.squarespace.com/static/5037f52d84ae1e87f694cfda/t/506fcc5c84aefb9a79a610b3/1349504092518/Pathways.jpg" alt="Pathways - Ñanas and Jhanas General Map">
+                </a>
+                <p class="image-caption">Click to view full size</p>
+            </div>
+
+            <h3>Arising & Passing Away Mind Maps</h3>
+            <div class="grid-2">
+                <div class="card">
+                    <a href="https://www.integrateddaniel.info/s/APmindmapbuscolors.jpg" target="_blank">
+                        <img src="https://www.integrateddaniel.info/s/APmindmapbuscolors.jpg" alt="A&P Mind Map - Bus Colors">
+                    </a>
+                    <p class="image-caption">A&P Mind Map (Bus Colors)</p>
+                </div>
+                <div class="card">
+                    <a href="https://www.integrateddaniel.info/s/APmindmapcolorschaos.jpg" target="_blank">
+                        <img src="https://www.integrateddaniel.info/s/APmindmapcolorschaos.jpg" alt="A&P Mind Map - Colors Chaos">
+                    </a>
+                    <p class="image-caption">A&P Mind Map (Chaotic/Nuanced)</p>
+                </div>
+            </div>
+
+            <p style="margin-top: 1.5rem;">
+                <a href="https://www.integrateddaniel.info/mind-maps" target="_blank">View all mind maps on IntegratedDaniel.info →</a>
+            </p>
+        </section>
+
+        <!-- Graphs Section -->
+        <section>
+            <h2>Insight Stage Graphs</h2>
+            <p>Visual graphs showing typical qualities of the stages of insight (ñanas) across various dimensions: pain/pleasure, motivation, sleep, mind speed, clarity, powers, and more.</p>
+            <a href="https://www.integrateddaniel.info/graphs" target="_blank" class="resource-link">
+                View All 11 Ñana Graphs
+            </a>
+        </section>
+
+        <!-- Ñanas & Jhanas Tables Section -->
+        <section>
+            <h2>Ñanas & Jhanas Reference Tables</h2>
+            <p>Detailed reference tables correlating the insight stages with jhana factors.</p>
+
+            <h3>Table Page 1</h3>
+            <div class="pdf-container">
+                <iframe src="https://static1.squarespace.com/static/5037f52d84ae1e87f694cfda/t/5475825de4b0ac156d2453a4/1416987229931/Nanas+and+jhanas+tablep1.pdf" title="Nanas and Jhanas Table Page 1"></iframe>
+                <div class="pdf-fallback">
+                    <a href="https://static1.squarespace.com/static/5037f52d84ae1e87f694cfda/t/5475825de4b0ac156d2453a4/1416987229931/Nanas+and+jhanas+tablep1.pdf" target="_blank">Download PDF (Page 1)</a>
+                </div>
+            </div>
+
+            <h3>Table Page 2</h3>
+            <div class="pdf-container">
+                <iframe src="https://static1.squarespace.com/static/5037f52d84ae1e87f694cfda/t/54758268e4b0ac156d2453d5/1416987240860/Nanas+and+jhanas+tablep2.pdf" title="Nanas and Jhanas Table Page 2"></iframe>
+                <div class="pdf-fallback">
+                    <a href="https://static1.squarespace.com/static/5037f52d84ae1e87f694cfda/t/54758268e4b0ac156d2453d5/1416987240860/Nanas+and+jhanas+tablep2.pdf" target="_blank">Download PDF (Page 2)</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Resources compiled for meditation practitioners. Content belongs to original authors.</p>
+    </footer>
+</body>
+</html>

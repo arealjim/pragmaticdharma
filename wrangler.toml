@@ -8,10 +8,9 @@ type = "Text"
 globs = ["pages/*.html"]
 fallthrough = true
 
-# Routes — set after DNS is configured
-# routes = [
-#   { pattern = "pragmaticdharma.org/*", zone_name = "pragmaticdharma.org" }
-# ]
+routes = [
+  { pattern = "pragmaticdharma.org/*", zone_name = "pragmaticdharma.org" }
+]
 
 # Secrets (set via `wrangler secret put <NAME>`):
 #   JWT_SECRET          — 32 hex bytes, shared with shield worker

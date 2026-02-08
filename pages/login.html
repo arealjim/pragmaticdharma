@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Sign In - Pragmatic Dharma</title>
+<style>
+  :root { --bg: #1a1a2e; --fg: #e0e0e0; --accent: #64ffda; --muted: #888; --border: #333; --card-bg: #16213e; --err: #ff6b6b; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 2rem; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .container { width: 100%; max-width: 400px; }
+  .back { display: block; margin-bottom: 1.5rem; color: var(--muted); font-size: 0.9rem; }
+  h1 { font-size: 1.5rem; font-weight: 400; color: var(--accent); margin-bottom: 0.5rem; }
+  .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+  .form-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; }
+  label { display: block; font-size: 0.9rem; color: var(--muted); margin-bottom: 0.25rem; }
+  input { width: 100%; padding: 0.6rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--fg); font-family: inherit; font-size: 1rem; margin-bottom: 1rem; }
+  input:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  .code-input { font-size: 1.5rem; letter-spacing: 0.3rem; text-align: center; }
+  button { width: 100%; padding: 0.6rem; background: var(--accent); color: var(--bg); border: none; border-radius: 4px; font-family: inherit; font-size: 1rem; font-weight: 600; cursor: pointer; }
+  button:hover { opacity: 0.9; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .msg { margin-top: 0.75rem; font-size: 0.9rem; }
+  .msg.ok { color: var(--accent); }
+  .msg.err { color: var(--err); }
+  .switch { margin-top: 1rem; text-align: center; font-size: 0.9rem; color: var(--muted); }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #fafafa; --fg: #222; --accent: #0d7377; --muted: #666; --border: #ddd; --card-bg: #fff; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <a class="back" href="/">&larr; Pragmatic Dharma</a>
+  <h1>Sign In</h1>
+  <p class="sub">Enter your email to receive a login code.</p>
+
+  <!-- Step 1: Email -->
+  <div class="form-box" id="step-email">
+    <label for="email">Email</label>
+    <input type="email" id="email" placeholder="you@example.com" autocomplete="email" autofocus>
+    <button id="btn-email" onclick="sendCode()">Send Code</button>
+    <div id="msg-email" class="msg"></div>
+  </div>
+
+  <!-- Step 2: Code verification (hidden initially) -->
+  <div class="form-box" id="step-code" style="display:none">
+    <p style="margin-bottom:1rem;font-size:0.9rem;color:var(--muted)">Check your email for a 6-digit code.</p>
+    <label for="code">Code</label>
+    <input type="text" id="code" class="code-input" placeholder="000000" maxlength="6" inputmode="numeric" autocomplete="one-time-code">
+    <button id="btn-code" onclick="verifyCode()">Verify</button>
+    <div id="msg-code" class="msg"></div>
+    <p style="margin-top:0.75rem;font-size:0.85rem;color:var(--muted)">Or click the link in your email.</p>
+  </div>
+
+  <div class="switch">
+    Don't have access? <a href="/signup">Request access</a>
+  </div>
+</div>
+
+<script>
+var userEmail = '';
+
+function sendCode() {
+  var email = document.getElementById('email').value.trim();
+  if (!email) { showMsg('msg-email', 'Please enter your email.', true); return; }
+
+  var btn = document.getElementById('btn-email');
+  btn.disabled = true;
+  showMsg('msg-email', '');
+
+  fetch('/api/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email })
+  })
+  .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+  .then(function(res) {
+    if (res.ok) {
+      userEmail = email;
+      document.getElementById('step-email').style.display = 'none';
+      document.getElementById('step-code').style.display = 'block';
+      document.getElementById('code').focus();
+    } else {
+      showMsg('msg-email', res.data.error || 'Something went wrong.', true);
+    }
+  })
+  .catch(function() { showMsg('msg-email', 'Network error.', true); })
+  .finally(function() { btn.disabled = false; });
+}
+
+function verifyCode() {
+  var code = document.getElementById('code').value.trim();
+  if (!code || code.length !== 6) { showMsg('msg-code', 'Enter the 6-digit code.', true); return; }
+
+  var btn = document.getElementById('btn-code');
+  btn.disabled = true;
+  showMsg('msg-code', '');
+
+  fetch('/api/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: userEmail, code: code }),
+    credentials: 'include'
+  })
+  .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+  .then(function(res) {
+    if (res.ok) {
+      window.location.href = res.data.redirect || '/';
+    } else {
+      showMsg('msg-code', res.data.error || 'Invalid code.', true);
+    }
+  })
+  .catch(function() { showMsg('msg-code', 'Network error.', true); })
+  .finally(function() { btn.disabled = false; });
+}
+
+// Allow enter key
+document.getElementById('email').addEventListener('keydown', function(e) { if (e.key === 'Enter') sendCode(); });
+document.getElementById('code').addEventListener('keydown', function(e) { if (e.key === 'Enter') verifyCode(); });
+
+function showMsg(id, text, isErr) {
+  var el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'msg ' + (isErr ? 'err' : 'ok');
+}
+</script>
+</body>
+</html>

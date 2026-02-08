@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Pragmatic Dharma</title>
+<style>
+  :root { --bg: #1a1a2e; --fg: #e0e0e0; --accent: #64ffda; --muted: #888; --border: #333; --card-bg: #16213e; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .header { text-align: center; padding: 3rem 2rem 2rem; }
+  .header h1 { font-size: 2rem; font-weight: 300; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 0.5rem; }
+  .header p { color: var(--muted); font-size: 1.05rem; max-width: 600px; margin: 0 auto; }
+
+  .user-bar { text-align: center; margin-bottom: 2rem; font-size: 0.9rem; color: var(--muted); }
+  .user-bar a { margin: 0 0.5rem; }
+
+  .intro { max-width: 700px; margin: 0 auto 2.5rem; padding: 0 2rem; text-align: center; }
+  .intro p { color: var(--muted); font-size: 0.95rem; margin-bottom: 0.75rem; }
+
+  .projects { max-width: 900px; margin: 0 auto 3rem; padding: 0 2rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
+  .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; transition: border-color 0.2s; }
+  .card:hover { border-color: var(--accent); }
+  .card h3 { color: var(--accent); font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .card p { color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem; }
+  .card .status { font-size: 0.8rem; display: inline-block; padding: 0.15rem 0.5rem; border-radius: 3px; }
+  .card .status.live { background: rgba(100,255,218,0.15); color: var(--accent); }
+  .card .status.soon { background: rgba(255,255,255,0.08); color: var(--muted); }
+  .card-link { display: block; color: inherit; text-decoration: none; }
+  .card-link:hover { text-decoration: none; }
+
+  .footer { text-align: center; padding: 2rem; color: var(--muted); font-size: 0.8rem; border-top: 1px solid var(--border); }
+  .footer a { color: var(--muted); }
+
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #fafafa; --fg: #222; --accent: #0d7377; --muted: #666; --border: #ddd; --card-bg: #fff; }
+    .card { box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Pragmatic Dharma</h1>
+  <p>Tools and resources for contemplative practice, personal development, and situational awareness.</p>
+</div>
+
+<div class="user-bar" id="user-bar"></div>
+
+<div class="intro">
+  <p>This is a small collection of projects built around a pragmatic approach to dharma practice &mdash; treating meditation and self-development as skills that can be trained and measured, not just philosophized about.</p>
+</div>
+
+<div class="projects">
+  <a class="card-link" href="https://shield.pragmaticdharma.org">
+    <div class="card">
+      <h3>Shield</h3>
+      <p>Automated daily intelligence briefing. Collects news, Reddit discussions, market data, and conflict reports from 33+ sources, synthesized by AI into a security-focused morning brief.</p>
+      <span class="status live">Live</span>
+    </div>
+  </a>
+
+  <a class="card-link" href="https://health.pragmaticdharma.org">
+    <div class="card">
+      <h3>Health Tracker</h3>
+      <p>Traditional Chinese Medicine body mapping and symptom tracking. Log daily observations and track patterns over time.</p>
+      <span class="status live">Live</span>
+    </div>
+  </a>
+
+  <a class="card-link" href="https://ego-assessment.pages.dev">
+    <div class="card">
+      <h3>Ego Development</h3>
+      <p>Interactive assessment based on Loevinger/Cook-Greuter ego development theory. Map your current stage and explore developmental edges.</p>
+      <span class="status live">Live</span>
+    </div>
+  </a>
+
+  <a class="card-link" href="/resources">
+    <div class="card">
+      <h3>Meditation Resources</h3>
+      <p>Curated maps and references for meditation practice: TMI stages, insight territory mind maps, nana graphs, and jhana reference tables.</p>
+      <span class="status live">Live</span>
+    </div>
+  </a>
+
+  <div class="card">
+    <h3>Meditation Finder</h3>
+    <p>Directory of meditation centers and retreat options. Scraped and updated regularly from retreat listing sites.</p>
+    <span class="status soon">Coming soon</span>
+  </div>
+</div>
+
+<div class="footer">
+  <p>Built by <a href="mailto:james.ronan.us@gmail.com">Jim</a></p>
+</div>
+
+<script>
+(function() {
+  fetch('/api/session', { credentials: 'include' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var bar = document.getElementById('user-bar');
+      if (data && data.user) {
+        bar.innerHTML = 'Signed in as <strong style="color:#e0e0e0">' + escapeHtml(data.user.name) + '</strong> &middot; <a href="/api/logout">Sign out</a>';
+        if (data.user.role === 'admin') {
+          bar.innerHTML += ' &middot; <a href="/api/admin/pending">Admin</a>';
+        }
+      } else {
+        bar.innerHTML = '<a href="/login">Sign in</a> &middot; <a href="/signup">Request access</a>';
+      }
+    })
+    .catch(function() {});
+
+  function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+})();
+</script>
+</body>
+</html>

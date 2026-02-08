@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# pd — Pragmatic Dharma admin CLI
+# Wraps wrangler d1 execute for common admin operations.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DB_NAME="pragmaticdharma"
+
+run_sql() {
+    cd "$SCRIPT_DIR" && npx wrangler d1 execute "$DB_NAME" --remote --command "$1" 2>/dev/null | \
+        python3 -c "
+import json, sys
+try:
+    # Skip wrangler prefix lines until we hit JSON
+    raw = sys.stdin.read()
+    start = raw.find('[')
+    if start == -1:
+        print('(no JSON output)')
+        sys.exit(0)
+    data = json.loads(raw[start:])
+    results = data[0].get('results', []) if isinstance(data, list) and data else []
+    if not results:
+        print('(no results)')
+        sys.exit(0)
+    # Print as table
+    keys = list(results[0].keys())
+    widths = {k: max(len(k), max((len(str(r.get(k, ''))) for r in results), default=0)) for k in keys}
+    header = '  '.join(k.ljust(widths[k]) for k in keys)
+    sep = '  '.join('-' * widths[k] for k in keys)
+    print(header)
+    print(sep)
+    for row in results:
+        print('  '.join(str(row.get(k, '')).ljust(widths[k]) for k in keys))
+except Exception as e:
+    print(f'Parse error: {e}', file=sys.stderr)
+    sys.exit(1)
+"
+}
+
+usage() {
+    cat <<'EOF'
+Usage: ./pd <command> [args]
+
+Commands:
+  approve EMAIL   — Approve a pending user
+  reject EMAIL    — Reject a pending user
+  users           — List all users
+  pending         — List pending signups
+  beta on|off     — Toggle open beta mode
+  logs [PROJECT] [N] — Show recent access logs (default: all, 50)
+  config          — Show all config values
+EOF
+    exit 1
+}
+
+[ $# -lt 1 ] && usage
+
+case "$1" in
+    approve)
+        [ $# -lt 2 ] && { echo "Usage: ./pd approve EMAIL"; exit 1; }
+        EMAIL=$(echo "$2" | tr '[:upper:]' '[:lower:]')
+        run_sql "UPDATE users SET status = 'approved', updated_at = datetime('now') WHERE email = '$EMAIL';"
+        echo "Approved: $EMAIL"
+        ;;
+    reject)
+        [ $# -lt 2 ] && { echo "Usage: ./pd reject EMAIL"; exit 1; }
+        EMAIL=$(echo "$2" | tr '[:upper:]' '[:lower:]')
+        run_sql "UPDATE users SET status = 'rejected', updated_at = datetime('now') WHERE email = '$EMAIL';"
+        echo "Rejected: $EMAIL"
+        ;;
+    users)
+        run_sql "SELECT email, name, status, role, created_at FROM users ORDER BY created_at DESC;"
+        ;;
+    pending)
+        run_sql "SELECT email, name, note, created_at FROM users WHERE status = 'pending' ORDER BY created_at DESC;"
+        ;;
+    beta)
+        [ $# -lt 2 ] && { echo "Usage: ./pd beta on|off"; exit 1; }
+        case "$2" in
+            on)
+                run_sql "INSERT INTO config (key, value, updated_at) VALUES ('open_beta', 'true', datetime('now')) ON CONFLICT(key) DO UPDATE SET value = 'true', updated_at = datetime('now');"
+                echo "Open beta: ON"
+                ;;
+            off)
+                run_sql "INSERT INTO config (key, value, updated_at) VALUES ('open_beta', 'false', datetime('now')) ON CONFLICT(key) DO UPDATE SET value = 'false', updated_at = datetime('now');"
+                echo "Open beta: OFF"
+                ;;
+            *)
+                echo "Usage: ./pd beta on|off"; exit 1
+                ;;
+        esac
+        ;;
+    logs)
+        PROJECT="${2:-}"
+        LIMIT="${3:-50}"
+        if [ -n "$PROJECT" ]; then
+            run_sql "SELECT user_email, project, path, ip_address, country, city, created_at FROM access_logs WHERE project = '$PROJECT' ORDER BY created_at DESC LIMIT $LIMIT;"
+        else
+            run_sql "SELECT user_email, project, path, ip_address, country, city, created_at FROM access_logs ORDER BY created_at DESC LIMIT $LIMIT;"
+        fi
+        ;;
+    config)
+        run_sql "SELECT key, value, updated_at FROM config ORDER BY key;"
+        ;;
+    *)
+        usage
+        ;;
+esac

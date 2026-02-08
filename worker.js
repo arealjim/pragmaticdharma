@@ -1,0 +1,702 @@
+// Pragmatic Dharma Platform Worker
+// Serves landing page, auth API, admin API
+// D1 database for users, sessions, access logs
+
+// =========================================================================
+// STATIC PAGES (loaded from pages/ at build time via import)
+// =========================================================================
+
+import INDEX_HTML from './pages/index.html';
+import LOGIN_HTML from './pages/login.html';
+import SIGNUP_HTML from './pages/signup.html';
+import RESOURCES_HTML from './pages/resources.html';
+
+const HTML_HEADERS = {
+  'content-type': 'text/html; charset=utf-8',
+  'cache-control': 'no-store',
+  'referrer-policy': 'no-referrer',
+};
+
+// =========================================================================
+// MAIN HANDLER
+// =========================================================================
+
+export default {
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const method = request.method;
+
+    // CORS preflight
+    if (method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: corsHeaders() });
+    }
+
+    // Health check
+    if (path === '/health') {
+      return new Response('ok', { headers: { 'content-type': 'text/plain' } });
+    }
+
+    try {
+      // Static pages
+      if (method === 'GET' && (path === '/' || path === '')) {
+        return htmlResponse(INDEX_HTML);
+      }
+      if (method === 'GET' && path === '/resources') {
+        return htmlResponse(RESOURCES_HTML);
+      }
+      if (method === 'GET' && path === '/login') {
+        return htmlResponse(LOGIN_HTML);
+      }
+      if (method === 'GET' && path === '/signup') {
+        return htmlResponse(SIGNUP_HTML);
+      }
+
+      // Auth API
+      if (method === 'POST' && path === '/api/signup') {
+        return handleSignup(request, env);
+      }
+      if (method === 'POST' && path === '/api/login') {
+        return handleLogin(request, env);
+      }
+      if (method === 'GET' && path.startsWith('/api/verify/')) {
+        const token = path.slice('/api/verify/'.length);
+        return handleVerifyLink(token, request, env);
+      }
+      if (method === 'POST' && path === '/api/verify') {
+        return handleVerifyCode(request, env);
+      }
+      if (method === 'GET' && path === '/api/session') {
+        return handleSession(request, env);
+      }
+      if (method === 'GET' && path === '/api/logout') {
+        return handleLogout(request, env);
+      }
+      if (method === 'POST' && path === '/api/logout') {
+        return handleLogout(request, env);
+      }
+
+      // Admin API
+      if (path.startsWith('/api/admin/')) {
+        return handleAdmin(request, env, path, method);
+      }
+
+      return new Response('Not Found', { status: 404 });
+    } catch (err) {
+      console.error('Handler error:', err);
+      return jsonResponse({ error: 'Internal error' }, 500);
+    }
+  },
+};
+
+// =========================================================================
+// SIGNUP
+// =========================================================================
+
+async function handleSignup(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: 'Invalid JSON' }, 400);
+  }
+
+  const name = (body.name || '').trim();
+  const email = (body.email || '').trim().toLowerCase();
+  const note = (body.note || '').trim();
+
+  if (!name || name.length > 100) {
+    return jsonResponse({ error: 'Name is required (max 100 chars)' }, 400);
+  }
+  if (!email || !email.includes('@') || email.length > 200) {
+    return jsonResponse({ error: 'Valid email is required' }, 400);
+  }
+
+  // Check if user already exists
+  const existing = await env.DB.prepare('SELECT id, status FROM users WHERE email = ?').bind(email).first();
+  if (existing) {
+    if (existing.status === 'approved') {
+      return jsonResponse({ error: 'Account already exists. Try signing in.' }, 409);
+    }
+    if (existing.status === 'pending') {
+      return jsonResponse({ error: 'Request already pending. You\'ll be notified when approved.' }, 409);
+    }
+    // Rejected — allow re-signup
+    await env.DB.prepare('UPDATE users SET name = ?, note = ?, status = \'pending\', updated_at = datetime(\'now\') WHERE id = ?')
+      .bind(name, note || null, existing.id).run();
+    notifyDiscord(env, signupEmbed(name, email, note, 're-signup'));
+    return jsonResponse({ ok: true, autoApproved: false });
+  }
+
+  // Check open beta
+  const openBeta = await getConfig(env, 'open_beta') === 'true';
+  const status = openBeta ? 'approved' : 'pending';
+
+  await env.DB.prepare('INSERT INTO users (email, name, status, note) VALUES (?, ?, ?, ?)')
+    .bind(email, name, status, note || null).run();
+
+  notifyDiscord(env, signupEmbed(name, email, note, openBeta ? 'auto-approved (open beta)' : 'pending'));
+
+  return jsonResponse({ ok: true, autoApproved: openBeta });
+}
+
+// =========================================================================
+// LOGIN (send magic link + code)
+// =========================================================================
+
+async function handleLogin(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: 'Invalid JSON' }, 400);
+  }
+
+  const email = (body.email || '').trim().toLowerCase();
+  if (!email || !email.includes('@')) {
+    return jsonResponse({ error: 'Valid email is required' }, 400);
+  }
+
+  // Check user exists and is approved
+  const user = await env.DB.prepare('SELECT id, status, role FROM users WHERE email = ?').bind(email).first();
+  if (!user) {
+    return jsonResponse({ error: 'No account found. Request access first.' }, 404);
+  }
+  if (user.status === 'pending') {
+    return jsonResponse({ error: 'Your access request is still pending approval.' }, 403);
+  }
+  if (user.status === 'rejected') {
+    return jsonResponse({ error: 'Your access request was not approved.' }, 403);
+  }
+
+  // Rate limit: 3 magic links per email per hour
+  const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+  const recentCount = await env.DB.prepare(
+    'SELECT COUNT(*) as cnt FROM magic_links WHERE email = ? AND created_at > ?'
+  ).bind(email, oneHourAgo).first();
+  if (recentCount && recentCount.cnt >= 3) {
+    return jsonResponse({ error: 'Too many login attempts. Try again in an hour.' }, 429);
+  }
+
+  // Generate token + 6-digit code
+  const token = generateToken();
+  const code = generateCode();
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+
+  await env.DB.prepare(
+    'INSERT INTO magic_links (token, code, email, user_id, expires_at) VALUES (?, ?, ?, ?, ?)'
+  ).bind(token, code, email, user.id, expiresAt).run();
+
+  // Send email via Resend
+  const baseUrl = new URL(request.url).origin;
+  const magicLink = `${baseUrl}/api/verify/${token}`;
+  const sent = await sendMagicLinkEmail(env, email, magicLink, code);
+
+  if (!sent) {
+    return jsonResponse({ error: 'Failed to send email. Try again.' }, 500);
+  }
+
+  return jsonResponse({ ok: true });
+}
+
+// =========================================================================
+// VERIFY (magic link click)
+// =========================================================================
+
+async function handleVerifyLink(token, request, env) {
+  if (!token || token.length !== 64) {
+    return redirectWithError('Invalid link');
+  }
+
+  const link = await env.DB.prepare(
+    'SELECT token, email, user_id, expires_at, used_at FROM magic_links WHERE token = ?'
+  ).bind(token).first();
+
+  if (!link || link.used_at) {
+    return redirectWithError('Link expired or already used');
+  }
+  if (new Date(link.expires_at) < new Date()) {
+    return redirectWithError('Link expired');
+  }
+
+  // Mark used
+  await env.DB.prepare('UPDATE magic_links SET used_at = datetime(\'now\') WHERE token = ?').bind(token).run();
+
+  // Create session + JWT
+  return createSessionAndRedirect(link.user_id, link.email, request, env);
+}
+
+// =========================================================================
+// VERIFY (6-digit code)
+// =========================================================================
+
+async function handleVerifyCode(request, env) {
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return jsonResponse({ error: 'Invalid JSON' }, 400);
+  }
+
+  const email = (body.email || '').trim().toLowerCase();
+  const code = (body.code || '').trim();
+
+  if (!email || !code || code.length !== 6) {
+    return jsonResponse({ error: 'Email and 6-digit code required' }, 400);
+  }
+
+  // Find matching unused, unexpired magic link by code + email
+  const link = await env.DB.prepare(
+    'SELECT token, email, user_id, expires_at, used_at FROM magic_links WHERE code = ? AND email = ? AND used_at IS NULL ORDER BY created_at DESC LIMIT 1'
+  ).bind(code, email).first();
+
+  if (!link) {
+    return jsonResponse({ error: 'Invalid or expired code' }, 401);
+  }
+  if (new Date(link.expires_at) < new Date()) {
+    return jsonResponse({ error: 'Code expired. Request a new one.' }, 401);
+  }
+
+  // Mark used
+  await env.DB.prepare('UPDATE magic_links SET used_at = datetime(\'now\') WHERE token = ?').bind(link.token).run();
+
+  // Create session + JWT
+  const user = await env.DB.prepare('SELECT id, email, name, role FROM users WHERE id = ?').bind(link.user_id).first();
+  if (!user) {
+    return jsonResponse({ error: 'User not found' }, 404);
+  }
+
+  const sessionToken = generateToken();
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const ua = request.headers.get('User-Agent') || 'unknown';
+
+  await env.DB.prepare(
+    'INSERT INTO sessions (token, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)'
+  ).bind(sessionToken, user.id, expiresAt, ip, ua).run();
+
+  const jwt = await signJWT(env, {
+    sub: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+  });
+
+  return jsonResponse(
+    { ok: true, redirect: '/' },
+    200,
+    { 'Set-Cookie': sessionCookie(jwt) }
+  );
+}
+
+// =========================================================================
+// SESSION
+// =========================================================================
+
+async function handleSession(request, env) {
+  const jwt = getJWTFromCookie(request);
+  if (!jwt) {
+    return jsonResponse({ user: null });
+  }
+
+  const payload = await verifyJWT(env, jwt);
+  if (!payload) {
+    return jsonResponse({ user: null });
+  }
+
+  return jsonResponse({
+    user: {
+      email: payload.email,
+      name: payload.name,
+      role: payload.role,
+    }
+  });
+}
+
+// =========================================================================
+// LOGOUT
+// =========================================================================
+
+async function handleLogout(request, env) {
+  const jwt = getJWTFromCookie(request);
+  if (jwt) {
+    const payload = await verifyJWT(env, jwt);
+    if (payload && payload.sessionToken) {
+      await env.DB.prepare('UPDATE sessions SET revoked_at = datetime(\'now\') WHERE token = ?')
+        .bind(payload.sessionToken).run().catch(() => {});
+    }
+  }
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      'Location': '/',
+      'Set-Cookie': 'pd_session=; Domain=.pragmaticdharma.org; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0',
+    },
+  });
+}
+
+// =========================================================================
+// ADMIN API
+// =========================================================================
+
+async function handleAdmin(request, env, path, method) {
+  // Require admin JWT
+  const jwt = getJWTFromCookie(request);
+  if (!jwt) return jsonResponse({ error: 'Unauthorized' }, 401);
+  const payload = await verifyJWT(env, jwt);
+  if (!payload || payload.role !== 'admin') return jsonResponse({ error: 'Forbidden' }, 403);
+
+  const route = path.replace('/api/admin/', '');
+
+  if (method === 'GET' && route === 'pending') {
+    const rows = await env.DB.prepare('SELECT email, name, note, created_at FROM users WHERE status = \'pending\' ORDER BY created_at DESC').all();
+    return jsonResponse({ users: rows.results });
+  }
+
+  if (method === 'GET' && route === 'users') {
+    const rows = await env.DB.prepare('SELECT email, name, status, role, created_at FROM users ORDER BY created_at DESC').all();
+    return jsonResponse({ users: rows.results });
+  }
+
+  if (method === 'POST' && route === 'approve') {
+    const body = await request.json();
+    const email = (body.email || '').trim().toLowerCase();
+    if (!email) return jsonResponse({ error: 'Email required' }, 400);
+    await env.DB.prepare('UPDATE users SET status = \'approved\', updated_at = datetime(\'now\') WHERE email = ?').bind(email).run();
+    return jsonResponse({ ok: true });
+  }
+
+  if (method === 'POST' && route === 'reject') {
+    const body = await request.json();
+    const email = (body.email || '').trim().toLowerCase();
+    if (!email) return jsonResponse({ error: 'Email required' }, 400);
+    await env.DB.prepare('UPDATE users SET status = \'rejected\', updated_at = datetime(\'now\') WHERE email = ?').bind(email).run();
+    return jsonResponse({ ok: true });
+  }
+
+  if (method === 'GET' && route.startsWith('access-logs')) {
+    const url = new URL(request.url);
+    const project = url.searchParams.get('project');
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '50'), 200);
+
+    let query = 'SELECT user_email, project, path, ip_address, country, city, isp, user_agent, created_at FROM access_logs';
+    const params = [];
+    if (project) {
+      query += ' WHERE project = ?';
+      params.push(project);
+    }
+    query += ' ORDER BY created_at DESC LIMIT ?';
+    params.push(limit);
+
+    const stmt = env.DB.prepare(query);
+    const rows = params.length === 2 ? await stmt.bind(params[0], params[1]).all() : await stmt.bind(params[0]).all();
+    return jsonResponse({ logs: rows.results });
+  }
+
+  if (method === 'POST' && route === 'config') {
+    const body = await request.json();
+    for (const [key, value] of Object.entries(body)) {
+      await env.DB.prepare('INSERT INTO config (key, value, updated_at) VALUES (?, ?, datetime(\'now\')) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime(\'now\')')
+        .bind(key, String(value), String(value)).run();
+    }
+    return jsonResponse({ ok: true });
+  }
+
+  return jsonResponse({ error: 'Not found' }, 404);
+}
+
+// =========================================================================
+// JWT (HMAC-SHA256 via Web Crypto)
+// =========================================================================
+
+async function signJWT(env, payload) {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const now = Math.floor(Date.now() / 1000);
+  const claims = { ...payload, iat: now, exp: now + 30 * 24 * 60 * 60 };
+
+  const encodedHeader = base64url(JSON.stringify(header));
+  const encodedPayload = base64url(JSON.stringify(claims));
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+
+  const key = await getSigningKey(env);
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signingInput));
+  const encodedSig = base64url(sig);
+
+  return `${signingInput}.${encodedSig}`;
+}
+
+async function verifyJWT(env, token) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+
+    const [encodedHeader, encodedPayload, encodedSig] = parts;
+    const signingInput = `${encodedHeader}.${encodedPayload}`;
+
+    const key = await getSigningKey(env);
+    const sig = base64urlDecode(encodedSig);
+    const valid = await crypto.subtle.verify('HMAC', key, sig, new TextEncoder().encode(signingInput));
+    if (!valid) return null;
+
+    const payload = JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+async function getSigningKey(env) {
+  const secret = env.JWT_SECRET;
+  return crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify']
+  );
+}
+
+function base64url(input) {
+  const data = typeof input === 'string' ? new TextEncoder().encode(input) : new Uint8Array(input);
+  const base64 = btoa(String.fromCharCode(...data));
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64urlDecode(str) {
+  const padded = str + '='.repeat((4 - str.length % 4) % 4);
+  const base64 = padded.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(base64);
+  return new Uint8Array([...binary].map(c => c.charCodeAt(0)));
+}
+
+// =========================================================================
+// SESSION HELPERS
+// =========================================================================
+
+async function createSessionAndRedirect(userId, email, request, env) {
+  const user = await env.DB.prepare('SELECT id, email, name, role FROM users WHERE id = ?').bind(userId).first();
+  if (!user) return redirectWithError('User not found');
+
+  const sessionToken = generateToken();
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const ua = request.headers.get('User-Agent') || 'unknown';
+
+  await env.DB.prepare(
+    'INSERT INTO sessions (token, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)'
+  ).bind(sessionToken, user.id, expiresAt, ip, ua).run();
+
+  const jwt = await signJWT(env, {
+    sub: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    sessionToken: sessionToken,
+  });
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      'Location': '/',
+      'Set-Cookie': sessionCookie(jwt),
+    },
+  });
+}
+
+function sessionCookie(jwt) {
+  return `pd_session=${jwt}; Domain=.pragmaticdharma.org; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=2592000`;
+}
+
+function getJWTFromCookie(request) {
+  const cookieHeader = request.headers.get('Cookie');
+  if (!cookieHeader) return null;
+  const cookies = cookieHeader.split(';').map(c => c.trim());
+  for (const cookie of cookies) {
+    const eq = cookie.indexOf('=');
+    if (eq === -1) continue;
+    if (cookie.slice(0, eq) === 'pd_session') {
+      return cookie.slice(eq + 1);
+    }
+  }
+  return null;
+}
+
+// =========================================================================
+// CRYPTO HELPERS
+// =========================================================================
+
+function generateToken() {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function generateCode() {
+  const array = new Uint8Array(3);
+  crypto.getRandomValues(array);
+  const num = (array[0] << 16) | (array[1] << 8) | array[2];
+  return String(num % 1000000).padStart(6, '0');
+}
+
+// =========================================================================
+// RESEND EMAIL
+// =========================================================================
+
+async function sendMagicLinkEmail(env, email, magicLink, code) {
+  const apiKey = env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error('RESEND_API_KEY not configured');
+    return false;
+  }
+
+  const fromEmail = env.FROM_EMAIL || 'noreply@pragmaticdharma.org';
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `Pragmatic Dharma <${fromEmail}>`,
+        to: [email],
+        subject: `Your login code: ${code}`,
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #333;">Sign in to Pragmatic Dharma</h2>
+            <p style="color: #666; font-size: 16px;">Use this code to sign in:</p>
+            <div style="background: #f5f5f5; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+              <span style="font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #333;">${code}</span>
+            </div>
+            <p style="color: #666; font-size: 16px;">Or click this link:</p>
+            <p>
+              <a href="${magicLink}" style="display: inline-block; background: #0d7377; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">Sign In</a>
+            </p>
+            <p style="color: #999; font-size: 14px; margin-top: 30px;">This link expires in 15 minutes. If you didn't request this, you can safely ignore this email.</p>
+          </div>
+        `,
+        text: `Your Pragmatic Dharma login code is: ${code}\n\nOr use this link: ${magicLink}\n\nThis link expires in 15 minutes.`
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Resend API error:', errorText);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Email send error:', error.message);
+    return false;
+  }
+}
+
+// =========================================================================
+// DISCORD NOTIFICATIONS
+// =========================================================================
+
+function notifyDiscord(env, embed) {
+  const webhookUrl = env.DISCORD_WEBHOOK_URL;
+  if (!webhookUrl) return;
+
+  fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ embeds: [embed] }),
+  }).catch(() => {});
+}
+
+function signupEmbed(name, email, note, status) {
+  const fields = [
+    { name: 'Name', value: name, inline: true },
+    { name: 'Email', value: email, inline: true },
+    { name: 'Status', value: status, inline: true },
+  ];
+  if (note) {
+    fields.push({ name: 'Note', value: note.slice(0, 500) });
+  }
+  return {
+    title: 'New Signup Request',
+    color: 0x64ffda,
+    fields,
+    timestamp: new Date().toISOString(),
+    footer: { text: 'pragmaticdharma.org' },
+  };
+}
+
+function accessEmbed(user, project, path, geo) {
+  return {
+    title: 'Access',
+    color: 0x3498db,
+    fields: [
+      { name: 'User', value: `${user.name} (${user.email})`, inline: true },
+      { name: 'Project', value: project, inline: true },
+      { name: 'Path', value: path || '/', inline: true },
+      { name: 'Location', value: formatLocation(geo), inline: true },
+      { name: 'ISP', value: geo.isp || 'Unknown', inline: true },
+      { name: 'IP', value: `\`${geo.ip}\``, inline: true },
+    ],
+    timestamp: new Date().toISOString(),
+    footer: { text: 'pragmaticdharma.org' },
+  };
+}
+
+function formatLocation(geo) {
+  const parts = [];
+  if (geo.city && geo.city !== 'Unknown') parts.push(geo.city);
+  if (geo.region && geo.region !== 'Unknown' && geo.region !== geo.city) parts.push(geo.region);
+  if (geo.country && geo.country !== 'Unknown') parts.push(geo.country);
+  return parts.length > 0 ? parts.join(', ') : 'Unknown location';
+}
+
+// =========================================================================
+// CONFIG HELPERS
+// =========================================================================
+
+async function getConfig(env, key) {
+  const row = await env.DB.prepare('SELECT value FROM config WHERE key = ?').bind(key).first();
+  return row ? row.value : null;
+}
+
+// =========================================================================
+// RESPONSE HELPERS
+// =========================================================================
+
+function htmlResponse(html) {
+  return new Response(html, { headers: HTML_HEADERS });
+}
+
+function jsonResponse(data, status = 200, extraHeaders = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'content-type': 'application/json',
+      'cache-control': 'no-store',
+      ...corsHeaders(),
+      ...extraHeaders,
+    },
+  });
+}
+
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Credentials': 'true',
+  };
+}
+
+function redirectWithError(msg) {
+  return new Response(`<html><body><p>${msg}</p><p><a href="/login">Try again</a></p></body></html>`, {
+    status: 400,
+    headers: HTML_HEADERS,
+  });
+}
+
+// Export for use by sub-project workers
+export { verifyJWT, getJWTFromCookie, signJWT, accessEmbed, formatLocation, notifyDiscord };

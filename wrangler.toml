@@ -1,0 +1,25 @@
+name = "pragmaticdharma"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Import HTML pages as text modules
+[[rules]]
+type = "Text"
+globs = ["pages/*.html"]
+fallthrough = true
+
+# Routes — set after DNS is configured
+# routes = [
+#   { pattern = "pragmaticdharma.org/*", zone_name = "pragmaticdharma.org" }
+# ]
+
+# Secrets (set via `wrangler secret put <NAME>`):
+#   JWT_SECRET          — 32 hex bytes, shared with shield worker
+#   RESEND_API_KEY      — Resend transactional email
+#   DISCORD_WEBHOOK_URL — Signup + access notifications
+
+# D1 database — fill ID after running: wrangler d1 create pragmaticdharma
+[[d1_databases]]
+binding = "DB"
+database_name = "pragmaticdharma"
+database_id = "d5bfd74e-5105-4136-a876-7d42e588d3d5"

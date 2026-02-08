@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Request Access - Pragmatic Dharma</title>
+<style>
+  :root { --bg: #1a1a2e; --fg: #e0e0e0; --accent: #64ffda; --muted: #888; --border: #333; --card-bg: #16213e; --err: #ff6b6b; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 2rem; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .container { width: 100%; max-width: 400px; }
+  .back { display: block; margin-bottom: 1.5rem; color: var(--muted); font-size: 0.9rem; }
+  h1 { font-size: 1.5rem; font-weight: 400; color: var(--accent); margin-bottom: 0.5rem; }
+  .sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+  .form-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; }
+  label { display: block; font-size: 0.9rem; color: var(--muted); margin-bottom: 0.25rem; }
+  input, textarea { width: 100%; padding: 0.6rem 0.75rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--fg); font-family: inherit; font-size: 1rem; margin-bottom: 1rem; }
+  textarea { min-height: 60px; resize: vertical; }
+  input:focus, textarea:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  button { width: 100%; padding: 0.6rem; background: var(--accent); color: var(--bg); border: none; border-radius: 4px; font-family: inherit; font-size: 1rem; font-weight: 600; cursor: pointer; }
+  button:hover { opacity: 0.9; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .msg { margin-top: 0.75rem; font-size: 0.9rem; }
+  .msg.ok { color: var(--accent); }
+  .msg.err { color: var(--err); }
+  .switch { margin-top: 1rem; text-align: center; font-size: 0.9rem; color: var(--muted); }
+  .opt { font-size: 0.8rem; color: var(--muted); margin-top: -0.75rem; margin-bottom: 1rem; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #fafafa; --fg: #222; --accent: #0d7377; --muted: #666; --border: #ddd; --card-bg: #fff; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <a class="back" href="/">&larr; Pragmatic Dharma</a>
+  <h1>Request Access</h1>
+  <p class="sub">Fill in your details. You'll be notified when approved.</p>
+
+  <div class="form-box" id="form-box">
+    <label for="name">Name</label>
+    <input type="text" id="name" placeholder="Your name" autocomplete="name" autofocus>
+    <label for="email">Email</label>
+    <input type="email" id="email" placeholder="you@example.com" autocomplete="email">
+    <label for="note">Note</label>
+    <textarea id="note" placeholder="How did you find this? (optional)"></textarea>
+    <p class="opt">Optional — helps with approval</p>
+    <button id="btn-signup" onclick="doSignup()">Request Access</button>
+    <div id="msg" class="msg"></div>
+  </div>
+
+  <div class="switch">
+    Already have access? <a href="/login">Sign in</a>
+  </div>
+</div>
+
+<script>
+function doSignup() {
+  var name = document.getElementById('name').value.trim();
+  var email = document.getElementById('email').value.trim();
+  var note = document.getElementById('note').value.trim();
+
+  if (!name) { showMsg('Please enter your name.', true); return; }
+  if (!email) { showMsg('Please enter your email.', true); return; }
+
+  var btn = document.getElementById('btn-signup');
+  btn.disabled = true;
+  showMsg('');
+
+  fetch('/api/signup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name, email: email, note: note }),
+    credentials: 'include'
+  })
+  .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, status: r.status, data: d }; }); })
+  .then(function(res) {
+    if (res.ok) {
+      if (res.data.autoApproved) {
+        // Open beta: auto-approved, redirect to login
+        showMsg('Account created! Redirecting to login...', false);
+        setTimeout(function() { window.location.href = '/login'; }, 1500);
+      } else {
+        document.getElementById('form-box').innerHTML = '<p style="text-align:center;padding:1rem">Request submitted. You\'ll receive an email when approved.</p>';
+      }
+    } else {
+      showMsg(res.data.error || 'Something went wrong.', true);
+    }
+  })
+  .catch(function() { showMsg('Network error.', true); })
+  .finally(function() { btn.disabled = false; });
+}
+
+document.getElementById('note').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSignup(); }
+});
+document.getElementById('email').addEventListener('keydown', function(e) { if (e.key === 'Enter') doSignup(); });
+
+function showMsg(text, isErr) {
+  var el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = 'msg ' + (isErr ? 'err' : 'ok');
+}
+</script>
+</body>
+</html>

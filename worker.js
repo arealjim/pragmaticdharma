@@ -124,7 +124,7 @@ async function handleSignup(request, env) {
     // Rejected — allow re-signup
     await env.DB.prepare('UPDATE users SET name = ?, note = ?, status = \'pending\', updated_at = datetime(\'now\') WHERE id = ?')
       .bind(name, note || null, existing.id).run();
-    notifyDiscord(env, signupEmbed(name, email, note, 're-signup'));
+    await notifyDiscord(env, signupEmbed(name, email, note, 're-signup'));
     return jsonResponse({ ok: true, autoApproved: false });
   }
 
@@ -135,7 +135,7 @@ async function handleSignup(request, env) {
   await env.DB.prepare('INSERT INTO users (email, name, status, note) VALUES (?, ?, ?, ?)')
     .bind(email, name, status, note || null).run();
 
-  notifyDiscord(env, signupEmbed(name, email, note, openBeta ? 'auto-approved (open beta)' : 'pending'));
+  await notifyDiscord(env, signupEmbed(name, email, note, openBeta ? 'auto-approved (open beta)' : 'pending'));
 
   return jsonResponse({ ok: true, autoApproved: openBeta });
 }
@@ -599,15 +599,19 @@ async function sendMagicLinkEmail(env, email, magicLink, code) {
 // DISCORD NOTIFICATIONS
 // =========================================================================
 
-function notifyDiscord(env, embed) {
+async function notifyDiscord(env, embed) {
   const webhookUrl = env.DISCORD_WEBHOOK_URL;
   if (!webhookUrl) return;
 
-  fetch(webhookUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ embeds: [embed] }),
-  }).catch(() => {});
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ embeds: [embed] }),
+    });
+  } catch (e) {
+    console.error('Discord notification failed:', e.message);
+  }
 }
 
 function signupEmbed(name, email, note, status) {

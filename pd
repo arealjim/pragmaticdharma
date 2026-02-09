@@ -59,12 +59,18 @@ case "$1" in
     approve)
         [ $# -lt 2 ] && { echo "Usage: ./pd approve EMAIL"; exit 1; }
         EMAIL=$(echo "$2" | tr '[:upper:]' '[:lower:]')
+        if ! echo "$EMAIL" | grep -qE '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'; then
+            echo "Error: Invalid email format"; exit 1
+        fi
         run_sql "UPDATE users SET status = 'approved', updated_at = datetime('now') WHERE email = '$EMAIL';"
         echo "Approved: $EMAIL"
         ;;
     reject)
         [ $# -lt 2 ] && { echo "Usage: ./pd reject EMAIL"; exit 1; }
         EMAIL=$(echo "$2" | tr '[:upper:]' '[:lower:]')
+        if ! echo "$EMAIL" | grep -qE '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'; then
+            echo "Error: Invalid email format"; exit 1
+        fi
         run_sql "UPDATE users SET status = 'rejected', updated_at = datetime('now') WHERE email = '$EMAIL';"
         echo "Rejected: $EMAIL"
         ;;
@@ -93,6 +99,14 @@ case "$1" in
     logs)
         PROJECT="${2:-}"
         LIMIT="${3:-50}"
+        # Validate PROJECT is alphanumeric (or hyphen/underscore)
+        if [ -n "$PROJECT" ] && ! echo "$PROJECT" | grep -qE '^[a-zA-Z0-9_-]+$'; then
+            echo "Error: PROJECT must be alphanumeric"; exit 1
+        fi
+        # Validate LIMIT is numeric
+        if ! echo "$LIMIT" | grep -qE '^[0-9]+$'; then
+            echo "Error: LIMIT must be a number"; exit 1
+        fi
         if [ -n "$PROJECT" ]; then
             run_sql "SELECT user_email, project, path, ip_address, country, city, created_at FROM access_logs WHERE project = '$PROJECT' ORDER BY created_at DESC LIMIT $LIMIT;"
         else

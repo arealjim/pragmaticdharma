@@ -15,6 +15,9 @@ const HTML_HEADERS = {
   'content-type': 'text/html; charset=utf-8',
   'cache-control': 'no-store',
   'referrer-policy': 'no-referrer',
+  'x-content-type-options': 'nosniff',
+  'x-frame-options': 'DENY',
+  'strict-transport-security': 'max-age=63072000; includeSubDomains',
 };
 
 // =========================================================================
@@ -94,6 +97,15 @@ export default {
 // =========================================================================
 
 async function handleSignup(request, env) {
+  // Global signup rate limit: max 20 per hour
+  const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+  const signupCount = await env.DB.prepare(
+    'SELECT COUNT(*) as cnt FROM users WHERE created_at > ?'
+  ).bind(oneHourAgo).first();
+  if (signupCount && signupCount.cnt >= 20) {
+    return jsonResponse({ error: 'Too many signups. Please try again later.' }, 429);
+  }
+
   let body;
   try {
     body = await request.json();
@@ -159,14 +171,9 @@ async function handleLogin(request, env) {
 
   // Check user exists and is approved
   const user = await env.DB.prepare('SELECT id, status, role FROM users WHERE email = ?').bind(email).first();
-  if (!user) {
-    return jsonResponse({ error: 'No account found. Request access first.' }, 404);
-  }
-  if (user.status === 'pending') {
-    return jsonResponse({ error: 'Your access request is still pending approval.' }, 403);
-  }
-  if (user.status === 'rejected') {
-    return jsonResponse({ error: 'Your access request was not approved.' }, 403);
+  if (!user || user.status !== 'approved') {
+    // Generic error to prevent email enumeration
+    return jsonResponse({ error: 'Unable to sign in. Check your email or request access first.' }, 403);
   }
 
   // Rate limit: 3 magic links per email per hour
@@ -251,9 +258,11 @@ async function handleVerifyCode(request, env) {
   ).bind(code, email).first();
 
   if (!link) {
+    await new Promise(r => setTimeout(r, 1000)); // Throttle brute force
     return jsonResponse({ error: 'Invalid or expired code' }, 401);
   }
   if (new Date(link.expires_at) < new Date()) {
+    await new Promise(r => setTimeout(r, 1000));
     return jsonResponse({ error: 'Code expired. Request a new one.' }, 401);
   }
 
@@ -432,6 +441,11 @@ async function verifyJWT(env, token) {
     if (parts.length !== 3) return null;
 
     const [encodedHeader, encodedPayload, encodedSig] = parts;
+
+    // Validate header algorithm
+    const header = JSON.parse(atob(encodedHeader.replace(/-/g, '+').replace(/_/g, '/')));
+    if (header.alg !== 'HS256') return null;
+
     const signingInput = `${encodedHeader}.${encodedPayload}`;
 
     const key = await getSigningKey(env);
@@ -440,7 +454,7 @@ async function verifyJWT(env, token) {
     if (!valid) return null;
 
     const payload = JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) return null;
+    if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
 
     return payload;
   } catch {
@@ -688,15 +702,19 @@ function jsonResponse(data, status = 200, extraHeaders = {}) {
 
 function corsHeaders() {
   return {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': 'https://pragmaticdharma.org',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Credentials': 'true',
   };
 }
 
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function redirectWithError(msg) {
-  return new Response(`<html><body><p>${msg}</p><p><a href="/login">Try again</a></p></body></html>`, {
+  const safe = escapeHtml(msg);
+  return new Response(`<html><body><p>${safe}</p><p><a href="/login">Try again</a></p></body></html>`, {
     status: 400,
     headers: HTML_HEADERS,
   });

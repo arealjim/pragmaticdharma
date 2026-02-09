@@ -35,16 +35,17 @@ npm run db:migrate       # Apply schema.sql to remote D1
 
 ## Sub-Projects
 
-| Subdomain | Worker | Status |
-|-----------|--------|--------|
-| shield.pragmaticdharma.org | psychic-shield | JWT + legacy token auth |
-| health.pragmaticdharma.org | tcm-tracker | Untouched (cloudflared tunnel) |
-| ego-assessment.pages.dev | ego-dev | Untouched (own auth) |
+| Subdomain | Worker/App | Auth |
+|-----------|------------|------|
+| shield.pragmaticdharma.org | psychic-shield (Cloudflare Worker) | JWT + legacy token auth |
+| health.pragmaticdharma.org | tcm-tracker (Flask via cloudflared tunnel) | JWT SSO (replaces password auth) |
+| psychology.pragmaticdharma.org | ego-assessment (Cloudflare Pages) | JWT SSO + existing magic link auth |
+| ego-assessment.pages.dev | ego-assessment (Cloudflare Pages) | Magic link auth only (no SSO cookie on this domain) |
 
 ## Secrets
 
 Set via `wrangler secret put <NAME>`:
-- `JWT_SECRET` — HMAC-SHA256 signing key (32 hex bytes), shared with shield worker
+- `JWT_SECRET` — HMAC-SHA256 signing key (32 hex bytes), shared across all 4 services (pragmaticdharma, psychic-shield, ego-assessment, tcm-tracker)
 - `RESEND_API_KEY` — Resend transactional email API key
 - `DISCORD_WEBHOOK_URL` — Discord webhook for signup/access notifications
 

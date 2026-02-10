@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Admin - Pragmatic Dharma</title>
+<style>
+  :root { --bg: #1a1a2e; --fg: #e0e0e0; --accent: #64ffda; --muted: #888; --border: #333; --card-bg: #16213e; --err: #ff6b6b; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.6; padding: 2rem; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .back { display: inline-block; margin-bottom: 1.5rem; color: var(--muted); font-size: 0.9rem; }
+  h1 { font-size: 1.5rem; font-weight: 400; color: var(--accent); margin-bottom: 0.5rem; }
+  h2 { font-size: 1.15rem; font-weight: 400; color: var(--accent); margin: 2rem 0 0.75rem; }
+  .container { max-width: 900px; margin: 0 auto; }
+  .msg { margin: 0.5rem 0; font-size: 0.9rem; }
+  .msg.ok { color: var(--accent); }
+  .msg.err { color: var(--err); }
+  table { width: 100%; border-collapse: collapse; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-bottom: 1rem; }
+  th, td { text-align: left; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+  th { color: var(--muted); font-weight: 500; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  td { color: var(--fg); }
+  tr:last-child td { border-bottom: none; }
+  .note-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 0.85rem; }
+  .status-badge { font-size: 0.8rem; padding: 0.1rem 0.4rem; border-radius: 3px; }
+  .status-badge.approved { background: rgba(100,255,218,0.15); color: var(--accent); }
+  .status-badge.pending { background: rgba(255,193,7,0.15); color: #ffc107; }
+  .status-badge.rejected { background: rgba(255,107,107,0.15); color: var(--err); }
+  .btn { padding: 0.3rem 0.7rem; border: none; border-radius: 4px; font-family: inherit; font-size: 0.8rem; cursor: pointer; font-weight: 500; }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-approve { background: var(--accent); color: var(--bg); }
+  .btn-approve:hover { opacity: 0.9; }
+  .btn-reject { background: transparent; border: 1px solid var(--err); color: var(--err); }
+  .btn-reject:hover { background: rgba(255,107,107,0.1); }
+  .btn-group { display: flex; gap: 0.4rem; }
+  .empty { color: var(--muted); font-size: 0.9rem; padding: 1rem; text-align: center; }
+  .loading { color: var(--muted); font-size: 0.9rem; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg: #fafafa; --fg: #222; --accent: #0d7377; --muted: #666; --border: #ddd; --card-bg: #fff; }
+  }
+  @media (max-width: 600px) {
+    body { padding: 1rem; }
+    th, td { padding: 0.4rem 0.5rem; font-size: 0.8rem; }
+    .note-cell { max-width: 100px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <a class="back" href="/">&larr; Pragmatic Dharma</a>
+  <h1>Admin</h1>
+  <div id="feedback" class="msg"></div>
+
+  <h2>Pending Requests</h2>
+  <div id="pending-section"><span class="loading">Loading...</span></div>
+
+  <h2>All Users</h2>
+  <div id="users-section"><span class="loading">Loading...</span></div>
+</div>
+
+<script>
+(function() {
+  // Check admin session
+  fetch('/api/session', { credentials: 'include' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data || !data.user || data.user.role !== 'admin') {
+        window.location.href = '/login';
+        return;
+      }
+      loadPending();
+      loadUsers();
+    })
+    .catch(function() { window.location.href = '/login'; });
+
+  function loadPending() {
+    fetch('/api/admin/pending', { credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var section = document.getElementById('pending-section');
+        if (!data.users || data.users.length === 0) {
+          section.innerHTML = '<p class="empty">No pending requests.</p>';
+          return;
+        }
+        var html = '<table><thead><tr><th>Name</th><th>Email</th><th>Note</th><th>Date</th><th>Actions</th></tr></thead><tbody>';
+        data.users.forEach(function(u) {
+          html += '<tr>'
+            + '<td>' + esc(u.name) + '</td>'
+            + '<td>' + esc(u.email) + '</td>'
+            + '<td class="note-cell" title="' + esc(u.note || '') + '">' + esc(u.note || '-') + '</td>'
+            + '<td>' + formatDate(u.created_at) + '</td>'
+            + '<td><div class="btn-group">'
+            + '<button class="btn btn-approve" onclick="doAction(\'approve\',\'' + esc(u.email) + '\',this)">Approve</button>'
+            + '<button class="btn btn-reject" onclick="doAction(\'reject\',\'' + esc(u.email) + '\',this)">Reject</button>'
+            + '</div></td></tr>';
+        });
+        html += '</tbody></table>';
+        section.innerHTML = html;
+      })
+      .catch(function() {
+        document.getElementById('pending-section').innerHTML = '<p class="msg err">Failed to load pending requests.</p>';
+      });
+  }
+
+  function loadUsers() {
+    fetch('/api/admin/users', { credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var section = document.getElementById('users-section');
+        if (!data.users || data.users.length === 0) {
+          section.innerHTML = '<p class="empty">No users.</p>';
+          return;
+        }
+        var html = '<table><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Role</th><th>Date</th></tr></thead><tbody>';
+        data.users.forEach(function(u) {
+          html += '<tr>'
+            + '<td>' + esc(u.name) + '</td>'
+            + '<td>' + esc(u.email) + '</td>'
+            + '<td><span class="status-badge ' + esc(u.status) + '">' + esc(u.status) + '</span></td>'
+            + '<td>' + esc(u.role || 'user') + '</td>'
+            + '<td>' + formatDate(u.created_at) + '</td>'
+            + '</tr>';
+        });
+        html += '</tbody></table>';
+        section.innerHTML = html;
+      })
+      .catch(function() {
+        document.getElementById('users-section').innerHTML = '<p class="msg err">Failed to load users.</p>';
+      });
+  }
+
+  window.doAction = function(action, email, btn) {
+    btn.disabled = true;
+    var feedback = document.getElementById('feedback');
+    feedback.textContent = '';
+
+    fetch('/api/admin/' + action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email }),
+      credentials: 'include'
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(res) {
+      if (res.ok) {
+        feedback.textContent = email + ' ' + action + 'd.';
+        feedback.className = 'msg ok';
+        loadPending();
+        loadUsers();
+      } else {
+        feedback.textContent = res.data.error || 'Action failed.';
+        feedback.className = 'msg err';
+        btn.disabled = false;
+      }
+    })
+    .catch(function() {
+      feedback.textContent = 'Network error.';
+      feedback.className = 'msg err';
+      btn.disabled = false;
+    });
+  };
+
+  function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function formatDate(iso) {
+    if (!iso) return '-';
+    var d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+})();
+</script>
+</body>
+</html>

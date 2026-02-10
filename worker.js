@@ -10,6 +10,7 @@ import INDEX_HTML from './pages/index.html';
 import LOGIN_HTML from './pages/login.html';
 import SIGNUP_HTML from './pages/signup.html';
 import RESOURCES_HTML from './pages/resources.html';
+import ADMIN_HTML from './pages/admin.html';
 
 const HTML_HEADERS = {
   'content-type': 'text/html; charset=utf-8',
@@ -53,6 +54,9 @@ export default {
       }
       if (method === 'GET' && path === '/signup') {
         return htmlResponse(SIGNUP_HTML);
+      }
+      if (method === 'GET' && path === '/admin') {
+        return htmlResponse(ADMIN_HTML);
       }
 
       // Auth API
@@ -373,6 +377,8 @@ async function handleAdmin(request, env, path, method) {
     const email = (body.email || '').trim().toLowerCase();
     if (!email) return jsonResponse({ error: 'Email required' }, 400);
     await env.DB.prepare('UPDATE users SET status = \'approved\', updated_at = datetime(\'now\') WHERE email = ?').bind(email).run();
+    const user = await env.DB.prepare('SELECT name FROM users WHERE email = ?').bind(email).first();
+    sendApprovalEmail(env, email, user ? user.name : '').catch(() => {});
     return jsonResponse({ ok: true });
   }
 
@@ -605,6 +611,54 @@ async function sendMagicLinkEmail(env, email, magicLink, code) {
     return true;
   } catch (error) {
     console.error('Email send error:', error.message);
+    return false;
+  }
+}
+
+async function sendApprovalEmail(env, email, name) {
+  const apiKey = env.RESEND_API_KEY;
+  if (!apiKey) {
+    console.error('RESEND_API_KEY not configured');
+    return false;
+  }
+
+  const fromEmail = env.FROM_EMAIL || 'noreply@pragmaticdharma.org';
+  const greeting = name ? `Hi ${name},` : 'Hi,';
+
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `Pragmatic Dharma <${fromEmail}>`,
+        to: [email],
+        subject: "You've been approved — Pragmatic Dharma",
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #333;">Welcome to Pragmatic Dharma</h2>
+            <p style="color: #666; font-size: 16px;">${greeting}</p>
+            <p style="color: #666; font-size: 16px;">Your access request has been approved. You can now sign in and start using the platform.</p>
+            <p style="margin: 24px 0;">
+              <a href="https://pragmaticdharma.org/login" style="display: inline-block; background: #0d7377; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">Sign In</a>
+            </p>
+            <p style="color: #999; font-size: 14px; margin-top: 30px;">If you didn't request access, you can safely ignore this email.</p>
+          </div>
+        `,
+        text: `${greeting}\n\nYour access request has been approved. You can now sign in at https://pragmaticdharma.org/login\n\nIf you didn't request access, you can safely ignore this email.`
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Resend API error (approval):', errorText);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Approval email error:', error.message);
     return false;
   }
 }

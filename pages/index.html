@@ -108,7 +108,7 @@
       if (data && data.user) {
         bar.innerHTML = 'Signed in as <strong style="color:#e0e0e0">' + escapeHtml(data.user.name) + '</strong> &middot; <a href="/api/logout">Sign out</a>';
         if (data.user.role === 'admin') {
-          bar.innerHTML += ' &middot; <a href="/api/admin/pending">Admin</a>';
+          bar.innerHTML += ' &middot; <a href="/admin">Admin</a>';
         }
       } else {
         bar.innerHTML = '<a href="/login">Sign in</a> &middot; <a href="/signup">Request access</a>';

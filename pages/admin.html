@@ -38,6 +38,10 @@
   .btn-group { display: flex; gap: 0.4rem; }
   .empty { color: var(--muted); font-size: 0.9rem; padding: 1rem; text-align: center; }
   .loading { color: var(--muted); font-size: 0.9rem; }
+  .add-user-form { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+  .add-user-form input { background: var(--card-bg); border: 1px solid var(--border); border-radius: 4px; padding: 0.4rem 0.6rem; color: var(--fg); font-family: inherit; font-size: 0.85rem; }
+  .add-user-form input:focus { outline: none; border-color: var(--accent); }
+  .add-user-form input::placeholder { color: var(--muted); }
   .project-badges { display: flex; gap: 0.3rem; flex-wrap: wrap; }
   .project-badge { font-size: 0.75rem; padding: 0.15rem 0.45rem; border-radius: 3px; cursor: pointer; border: 1px solid var(--border); user-select: none; transition: opacity 0.15s, background 0.15s; }
   .project-badge.active { background: rgba(100,255,218,0.2); color: var(--accent); border-color: var(--accent); }
@@ -62,6 +66,14 @@
 
   <h2>Pending Requests</h2>
   <div id="pending-section"><span class="loading">Loading...</span></div>
+
+  <h2>Add User</h2>
+  <div class="add-user-form">
+    <input type="text" id="add-name" placeholder="Name" autocomplete="off">
+    <input type="email" id="add-email" placeholder="Email" autocomplete="off">
+    <button class="btn btn-approve" onclick="createUser()">Add</button>
+  </div>
+  <div id="add-feedback" class="msg"></div>
 
   <h2>All Users</h2>
   <div id="users-section"><span class="loading">Loading...</span></div>
@@ -188,6 +200,35 @@
       }
     })
     .catch(function() { badge.classList.remove('saving'); });
+  };
+
+  window.createUser = function() {
+    var name = document.getElementById('add-name').value.trim();
+    var email = document.getElementById('add-email').value.trim();
+    var fb = document.getElementById('add-feedback');
+    fb.textContent = '';
+    if (!name || !email) { fb.textContent = 'Name and email required.'; fb.className = 'msg err'; return; }
+
+    fetch('/api/admin/create-user', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, email: email }),
+      credentials: 'include'
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(res) {
+      if (res.ok) {
+        fb.textContent = email + ' added.';
+        fb.className = 'msg ok';
+        document.getElementById('add-name').value = '';
+        document.getElementById('add-email').value = '';
+        loadUsers();
+      } else {
+        fb.textContent = res.data.error || 'Failed to add user.';
+        fb.className = 'msg err';
+      }
+    })
+    .catch(function() { fb.textContent = 'Network error.'; fb.className = 'msg err'; });
   };
 
   window.doAction = function(action, email, btn) {

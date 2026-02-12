@@ -404,6 +404,23 @@ async function handleAdmin(request, env, path, method) {
     return jsonResponse({ ok: true });
   }
 
+  if (method === 'POST' && route === 'create-user') {
+    const body = await request.json();
+    const name = (body.name || '').trim();
+    const email = (body.email || '').trim().toLowerCase();
+    if (!name || !email || !email.includes('@')) return jsonResponse({ error: 'Name and valid email required' }, 400);
+    const existing = await env.DB.prepare('SELECT id, status FROM users WHERE email = ?').bind(email).first();
+    if (existing) return jsonResponse({ error: 'User already exists' }, 409);
+    const result = await env.DB.prepare('INSERT INTO users (email, name, status) VALUES (?, ?, \'approved\')').bind(email, name).run();
+    const user = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+    if (user) {
+      for (const project of KNOWN_PROJECTS) {
+        await env.DB.prepare('INSERT OR IGNORE INTO user_projects (user_id, project) VALUES (?, ?)').bind(user.id, project).run();
+      }
+    }
+    return jsonResponse({ ok: true });
+  }
+
   if (method === 'POST' && route === 'reject') {
     const body = await request.json();
     const email = (body.email || '').trim().toLowerCase();

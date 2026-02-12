@@ -71,5 +71,13 @@ CREATE TABLE IF NOT EXISTS config (
     updated_at TEXT DEFAULT (datetime('now'))
 );
 
+-- User project access (default: all projects on approval)
+CREATE TABLE IF NOT EXISTS user_projects (
+    user_id TEXT NOT NULL,
+    project TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (user_id, project)
+);
+
 -- Initial config
 INSERT OR IGNORE INTO config (key, value) VALUES ('open_beta', 'false');

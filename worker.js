@@ -12,6 +12,8 @@ import SIGNUP_HTML from './pages/signup.html';
 import RESOURCES_HTML from './pages/resources.html';
 import ADMIN_HTML from './pages/admin.html';
 
+const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment'];
+
 const HTML_HEADERS = {
   'content-type': 'text/html; charset=utf-8',
   'cache-control': 'no-store',
@@ -288,11 +290,15 @@ async function handleVerifyCode(request, env) {
     'INSERT INTO sessions (token, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)'
   ).bind(sessionToken, user.id, expiresAt, ip, ua).run();
 
+  const projectRows = await env.DB.prepare('SELECT project FROM user_projects WHERE user_id = ?').bind(user.id).all();
+  const projects = projectRows.results.map(function(r) { return r.project; });
+
   const jwt = await signJWT(env, {
     sub: user.id,
     email: user.email,
     name: user.name,
     role: user.role,
+    projects: projects,
   });
 
   return jsonResponse(
@@ -368,8 +374,18 @@ async function handleAdmin(request, env, path, method) {
   }
 
   if (method === 'GET' && route === 'users') {
-    const rows = await env.DB.prepare('SELECT email, name, status, role, created_at FROM users ORDER BY created_at DESC').all();
-    return jsonResponse({ users: rows.results });
+    const rows = await env.DB.prepare('SELECT id, email, name, status, role, created_at FROM users ORDER BY created_at DESC').all();
+    // Attach project access for each user
+    const projectRows = await env.DB.prepare('SELECT user_id, project FROM user_projects').all();
+    const projectMap = {};
+    for (const row of projectRows.results) {
+      if (!projectMap[row.user_id]) projectMap[row.user_id] = [];
+      projectMap[row.user_id].push(row.project);
+    }
+    const users = rows.results.map(function(u) {
+      return { id: u.id, email: u.email, name: u.name, status: u.status, role: u.role, created_at: u.created_at, projects: projectMap[u.id] || [] };
+    });
+    return jsonResponse({ users: users });
   }
 
   if (method === 'POST' && route === 'approve') {
@@ -377,7 +393,13 @@ async function handleAdmin(request, env, path, method) {
     const email = (body.email || '').trim().toLowerCase();
     if (!email) return jsonResponse({ error: 'Email required' }, 400);
     await env.DB.prepare('UPDATE users SET status = \'approved\', updated_at = datetime(\'now\') WHERE email = ?').bind(email).run();
-    const user = await env.DB.prepare('SELECT name FROM users WHERE email = ?').bind(email).first();
+    const user = await env.DB.prepare('SELECT id, name FROM users WHERE email = ?').bind(email).first();
+    if (user) {
+      // Grant all projects by default
+      for (const project of KNOWN_PROJECTS) {
+        await env.DB.prepare('INSERT OR IGNORE INTO user_projects (user_id, project) VALUES (?, ?)').bind(user.id, project).run();
+      }
+    }
     sendApprovalEmail(env, email, user ? user.name : '').catch(() => {});
     return jsonResponse({ ok: true });
   }
@@ -388,6 +410,29 @@ async function handleAdmin(request, env, path, method) {
     if (!email) return jsonResponse({ error: 'Email required' }, 400);
     await env.DB.prepare('UPDATE users SET status = \'rejected\', updated_at = datetime(\'now\') WHERE email = ?').bind(email).run();
     return jsonResponse({ ok: true });
+  }
+
+  if (method === 'GET' && route === 'user-projects') {
+    const url = new URL(request.url);
+    const userId = url.searchParams.get('user_id');
+    if (!userId) return jsonResponse({ error: 'user_id required' }, 400);
+    const rows = await env.DB.prepare('SELECT project FROM user_projects WHERE user_id = ?').bind(userId).all();
+    return jsonResponse({ projects: rows.results.map(function(r) { return r.project; }) });
+  }
+
+  if (method === 'POST' && route === 'user-projects') {
+    const body = await request.json();
+    const userId = body.user_id;
+    const projects = body.projects;
+    if (!userId || !Array.isArray(projects)) return jsonResponse({ error: 'user_id and projects[] required' }, 400);
+    // Validate projects
+    const valid = projects.filter(function(p) { return KNOWN_PROJECTS.indexOf(p) !== -1; });
+    // Replace: delete all then insert selected
+    await env.DB.prepare('DELETE FROM user_projects WHERE user_id = ?').bind(userId).run();
+    for (const project of valid) {
+      await env.DB.prepare('INSERT INTO user_projects (user_id, project) VALUES (?, ?)').bind(userId, project).run();
+    }
+    return jsonResponse({ ok: true, projects: valid });
   }
 
   if (method === 'GET' && route.startsWith('access-logs')) {
@@ -509,11 +554,15 @@ async function createSessionAndRedirect(userId, email, request, env) {
     'INSERT INTO sessions (token, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)'
   ).bind(sessionToken, user.id, expiresAt, ip, ua).run();
 
+  const projectRows = await env.DB.prepare('SELECT project FROM user_projects WHERE user_id = ?').bind(user.id).all();
+  const projects = projectRows.results.map(function(r) { return r.project; });
+
   const jwt = await signJWT(env, {
     sub: user.id,
     email: user.email,
     name: user.name,
     role: user.role,
+    projects: projects,
     sessionToken: sessionToken,
   });
 

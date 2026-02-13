@@ -53,11 +53,25 @@
   </div>
 
   <div class="switch">
-    Already have access? <a href="/login">Sign in</a>
+    Already have access? <a id="login-link" href="/login">Sign in</a>
   </div>
 </div>
 
 <script>
+// Read ?redirect= param to preserve through signup → login flow
+var redirectUrl = '';
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var r = params.get('redirect') || '';
+  if (r && /^https:\/\/[a-z0-9-]+\.pragmaticdharma\.org(\/.*)?$/.test(r)) {
+    redirectUrl = r;
+  }
+  // Propagate redirect to login link
+  if (redirectUrl) {
+    document.getElementById('login-link').href = '/login?redirect=' + encodeURIComponent(redirectUrl);
+  }
+})();
+
 function doSignup() {
   var name = document.getElementById('name').value.trim();
   var email = document.getElementById('email').value.trim();
@@ -70,19 +84,24 @@ function doSignup() {
   btn.disabled = true;
   showMsg('');
 
+  var payload = { name: name, email: email, note: note };
+  if (redirectUrl) payload.project = redirectUrl;
+
   fetch('/api/signup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: name, email: email, note: note }),
+    body: JSON.stringify(payload),
     credentials: 'include'
   })
   .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, status: r.status, data: d }; }); })
   .then(function(res) {
     if (res.ok) {
       if (res.data.autoApproved) {
-        // Open beta: auto-approved, redirect to login
+        // Open beta: auto-approved, redirect to login (with redirect param)
         showMsg('Account created! Redirecting to login...', false);
-        setTimeout(function() { window.location.href = '/login'; }, 1500);
+        var loginUrl = '/login';
+        if (redirectUrl) loginUrl += '?redirect=' + encodeURIComponent(redirectUrl);
+        setTimeout(function() { window.location.href = loginUrl; }, 1500);
       } else {
         document.getElementById('form-box').innerHTML = '<p style="text-align:center;padding:1rem">Request submitted. You\'ll receive an email when approved.</p>';
       }

@@ -58,12 +58,22 @@
   </div>
 
   <div class="switch">
-    Don't have access? <a href="/signup">Request access</a>
+    Don't have access? <a id="signup-link" href="/signup">Request access</a>
   </div>
 </div>
 
 <script>
 var userEmail = '';
+
+// Read ?redirect= param for post-login redirect to sub-projects
+var redirectUrl = '';
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var r = params.get('redirect') || '';
+  if (r && /^https:\/\/[a-z0-9-]+\.pragmaticdharma\.org(\/.*)?$/.test(r)) {
+    redirectUrl = r;
+  }
+})();
 
 function sendCode() {
   var email = document.getElementById('email').value.trim();
@@ -73,10 +83,13 @@ function sendCode() {
   btn.disabled = true;
   showMsg('msg-email', '');
 
+  var payload = { email: email };
+  if (redirectUrl) payload.redirect = redirectUrl;
+
   fetch('/api/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: email })
+    body: JSON.stringify(payload)
   })
   .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
   .then(function(res) {
@@ -101,10 +114,13 @@ function verifyCode() {
   btn.disabled = true;
   showMsg('msg-code', '');
 
+  var payload = { email: userEmail, code: code };
+  if (redirectUrl) payload.redirect = redirectUrl;
+
   fetch('/api/verify', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: userEmail, code: code }),
+    body: JSON.stringify(payload),
     credentials: 'include'
   })
   .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
@@ -127,6 +143,11 @@ function showMsg(id, text, isErr) {
   var el = document.getElementById(id);
   el.textContent = text;
   el.className = 'msg ' + (isErr ? 'err' : 'ok');
+}
+
+// Propagate redirect param to signup link
+if (redirectUrl) {
+  document.getElementById('signup-link').href = '/signup?redirect=' + encodeURIComponent(redirectUrl);
 }
 </script>
 </body>

@@ -48,6 +48,22 @@
   .project-badge.inactive { background: transparent; color: var(--muted); opacity: 0.5; }
   .project-badge:hover { opacity: 1; }
   .project-badge.saving { opacity: 0.3; pointer-events: none; }
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0; border-bottom: 1px solid var(--border); }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-label { font-size: 0.9rem; }
+  .toggle-switch { position: relative; width: 40px; height: 22px; cursor: pointer; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--border); border-radius: 11px; transition: background 0.2s; }
+  .toggle-slider:before { content: ''; position: absolute; width: 16px; height: 16px; left: 3px; bottom: 3px; background: var(--fg); border-radius: 50%; transition: transform 0.2s; }
+  .toggle-switch input:checked + .toggle-slider { background: var(--accent); }
+  .toggle-switch input:checked + .toggle-slider:before { transform: translateX(18px); background: var(--bg); }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+  .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+  .stat-card .stat-label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-card .stat-value { font-size: 1.5rem; font-weight: 600; color: var(--accent); margin-top: 0.25rem; }
+  .stat-card .stat-sub { font-size: 0.8rem; color: var(--muted); margin-top: 0.15rem; }
+  .project-stats-section { margin-bottom: 1.5rem; }
+  .project-stats-header { font-size: 0.95rem; color: var(--fg); margin-bottom: 0.5rem; font-weight: 500; }
   @media (prefers-color-scheme: light) {
     :root { --bg: #fafafa; --fg: #222; --accent: #0d7377; --muted: #666; --border: #ddd; --card-bg: #fff; }
   }
@@ -63,6 +79,29 @@
   <a class="back" href="/">&larr; Pragmatic Dharma</a>
   <h1>Admin</h1>
   <div id="feedback" class="msg"></div>
+
+  <h2>Open Beta</h2>
+  <div id="beta-section" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:0.5rem 1rem;margin-bottom:1rem;">
+    <div class="toggle-row">
+      <span class="toggle-label">Global (all projects)</span>
+      <label class="toggle-switch"><input type="checkbox" id="beta-global" onchange="toggleBeta('open_beta',this.checked)"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">Health Tracker</span>
+      <label class="toggle-switch"><input type="checkbox" id="beta-health" onchange="toggleBeta('open_beta:health',this.checked)"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">Psychic Shield</span>
+      <label class="toggle-switch"><input type="checkbox" id="beta-shield" onchange="toggleBeta('open_beta:shield',this.checked)"><span class="toggle-slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <span class="toggle-label">Ego Assessment</span>
+      <label class="toggle-switch"><input type="checkbox" id="beta-ego-assessment" onchange="toggleBeta('open_beta:ego-assessment',this.checked)"><span class="toggle-slider"></span></label>
+    </div>
+  </div>
+
+  <h2>Project Stats</h2>
+  <div id="stats-section"><span class="loading">Loading...</span></div>
 
   <h2>Pending Requests</h2>
   <div id="pending-section"><span class="loading">Loading...</span></div>
@@ -89,10 +128,94 @@
         window.location.href = '/login';
         return;
       }
+      loadConfig();
+      loadProjectStats();
       loadPending();
       loadUsers();
     })
     .catch(function() { window.location.href = '/login'; });
+
+  function loadConfig() {
+    fetch('/api/admin/config', { credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.config) return;
+        var c = data.config;
+        var el;
+        el = document.getElementById('beta-global'); if (el) el.checked = c.open_beta === 'true';
+        el = document.getElementById('beta-health'); if (el) el.checked = c['open_beta:health'] === 'true';
+        el = document.getElementById('beta-shield'); if (el) el.checked = c['open_beta:shield'] === 'true';
+        el = document.getElementById('beta-ego-assessment'); if (el) el.checked = c['open_beta:ego-assessment'] === 'true';
+      });
+  }
+
+  window.toggleBeta = function(key, enabled) {
+    var body = {};
+    body[key] = enabled ? 'true' : 'false';
+    fetch('/api/admin/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      credentials: 'include'
+    });
+  };
+
+  function loadProjectStats() {
+    var section = document.getElementById('stats-section');
+    var html = '';
+
+    // Fetch stats from all three sources in parallel
+    var shieldDone = false, egoDone = false, healthDone = false;
+    var shieldHtml = '', egoHtml = '', healthHtml = '';
+
+    function renderStats() {
+      if (!shieldDone || !egoDone || !healthDone) return;
+      section.innerHTML = shieldHtml + egoHtml + healthHtml || '<p class="empty">No stats available.</p>';
+    }
+
+    // Shield stats (from local access logs)
+    fetch('/api/admin/access-logs?project=shield&limit=50', { credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var logs = data.logs || [];
+        var uniqueUsers = {};
+        logs.forEach(function(l) { if (l.user_email) uniqueUsers[l.user_email] = true; });
+        shieldHtml = '<div class="project-stats-section"><div class="project-stats-header">Psychic Shield</div><div class="stats-grid">'
+          + '<div class="stat-card"><div class="stat-label">Recent Accesses</div><div class="stat-value">' + logs.length + '</div></div>'
+          + '<div class="stat-card"><div class="stat-label">Unique Users</div><div class="stat-value">' + Object.keys(uniqueUsers).length + '</div></div>'
+          + '</div></div>';
+      })
+      .catch(function() { shieldHtml = ''; })
+      .finally(function() { shieldDone = true; renderStats(); });
+
+    // Ego Assessment stats (cross-origin)
+    fetch('https://psychology.pragmaticdharma.org/api/admin/stats', { credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        egoHtml = '<div class="project-stats-section"><div class="project-stats-header">Ego Assessment</div><div class="stats-grid">'
+          + '<div class="stat-card"><div class="stat-label">Users</div><div class="stat-value">' + (data.totalUsers || 0) + '</div></div>'
+          + '<div class="stat-card"><div class="stat-label">Completions</div><div class="stat-value">' + (data.totalCompletions || 0) + '</div></div>'
+          + '<div class="stat-card"><div class="stat-label">Active (7d)</div><div class="stat-value">' + (data.activeUsersLast7Days || 0) + '</div></div>'
+          + '<div class="stat-card"><div class="stat-label">Leaderboard</div><div class="stat-value">' + (data.leaderboardEntries || 0) + '</div></div>'
+          + '</div></div>';
+      })
+      .catch(function() { egoHtml = '<div class="project-stats-section"><div class="project-stats-header">Ego Assessment</div><p class="empty">Unable to fetch stats.</p></div>'; })
+      .finally(function() { egoDone = true; renderStats(); });
+
+    // Health Tracker stats (cross-origin)
+    fetch('https://health.pragmaticdharma.org/admin/api/usage', { credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var users = data.per_user || [];
+        var daily = data.daily || [];
+        healthHtml = '<div class="project-stats-section"><div class="project-stats-header">Health Tracker</div><div class="stats-grid">'
+          + '<div class="stat-card"><div class="stat-label">Active Users</div><div class="stat-value">' + users.length + '</div></div>'
+          + '<div class="stat-card"><div class="stat-label">Recent Days</div><div class="stat-value">' + daily.length + '</div></div>'
+          + '</div></div>';
+      })
+      .catch(function() { healthHtml = '<div class="project-stats-section"><div class="project-stats-header">Health Tracker</div><p class="empty">Unable to fetch stats.</p></div>'; })
+      .finally(function() { healthDone = true; renderStats(); });
+  }
 
   function loadPending() {
     fetch('/api/admin/pending', { credentials: 'include' })

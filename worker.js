@@ -14,6 +14,29 @@ import ADMIN_HTML from './pages/admin.html';
 
 const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment'];
 
+function validateRedirectUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  url = url.trim();
+  // Allow only https://*.pragmaticdharma.org paths
+  if (/^https:\/\/[a-z0-9-]+\.pragmaticdharma\.org(\/.*)?$/.test(url)) return url;
+  return '';
+}
+
+function redirectUrlToProject(url) {
+  // Map subdomain URLs to project keys
+  const map = {
+    'health.pragmaticdharma.org': 'health',
+    'shield.pragmaticdharma.org': 'shield',
+    'psychology.pragmaticdharma.org': 'ego-assessment',
+  };
+  try {
+    const host = new URL(url).hostname;
+    return map[host] || null;
+  } catch {
+    return null;
+  }
+}
+
 const HTML_HEADERS = {
   'content-type': 'text/html; charset=utf-8',
   'cache-control': 'no-store',
@@ -146,14 +169,42 @@ async function handleSignup(request, env) {
     return jsonResponse({ ok: true, autoApproved: false });
   }
 
-  // Check open beta
-  const openBeta = await getConfig(env, 'open_beta') === 'true';
+  // Check open beta — per-project or global
+  const project = (body.project || '').trim();
+  let openBeta = await getConfig(env, 'open_beta') === 'true';
+  let grantProject = null;
+  if (!openBeta && project) {
+    // Map redirect URLs to project keys
+    const projectKey = redirectUrlToProject(project) || project;
+    if (KNOWN_PROJECTS.indexOf(projectKey) !== -1) {
+      const perProject = await getConfig(env, 'open_beta:' + projectKey) === 'true';
+      if (perProject) {
+        openBeta = true;
+        grantProject = projectKey;
+      }
+    }
+  }
   const status = openBeta ? 'approved' : 'pending';
 
   await env.DB.prepare('INSERT INTO users (email, name, status, note) VALUES (?, ?, ?, ?)')
     .bind(email, name, status, note || null).run();
 
-  await notifyDiscord(env, signupEmbed(name, email, note, openBeta ? 'auto-approved (open beta)' : 'pending'));
+  if (openBeta) {
+    const user = await env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+    if (user) {
+      if (grantProject) {
+        // Per-project beta: grant only that project
+        await env.DB.prepare('INSERT OR IGNORE INTO user_projects (user_id, project) VALUES (?, ?)').bind(user.id, grantProject).run();
+      } else {
+        // Global beta: grant all projects
+        for (const p of KNOWN_PROJECTS) {
+          await env.DB.prepare('INSERT OR IGNORE INTO user_projects (user_id, project) VALUES (?, ?)').bind(user.id, p).run();
+        }
+      }
+    }
+  }
+
+  await notifyDiscord(env, signupEmbed(name, email, note, openBeta ? ('auto-approved (open beta' + (grantProject ? ': ' + grantProject : '') + ')') : 'pending'));
 
   return jsonResponse({ ok: true, autoApproved: openBeta });
 }
@@ -202,7 +253,9 @@ async function handleLogin(request, env) {
 
   // Send email via Resend
   const baseUrl = new URL(request.url).origin;
-  const magicLink = `${baseUrl}/api/verify/${token}`;
+  const redirect = validateRedirectUrl(body.redirect);
+  let magicLink = `${baseUrl}/api/verify/${token}`;
+  if (redirect) magicLink += '?redirect=' + encodeURIComponent(redirect);
   const sent = await sendMagicLinkEmail(env, email, magicLink, code);
 
   if (!sent) {
@@ -217,6 +270,10 @@ async function handleLogin(request, env) {
 // =========================================================================
 
 async function handleVerifyLink(token, request, env) {
+  // Strip query params from token if present
+  const qIdx = token.indexOf('?');
+  if (qIdx !== -1) token = token.slice(0, qIdx);
+
   if (!token || token.length !== 64) {
     return redirectWithError('Invalid link');
   }
@@ -235,8 +292,12 @@ async function handleVerifyLink(token, request, env) {
   // Mark used
   await env.DB.prepare('UPDATE magic_links SET used_at = datetime(\'now\') WHERE token = ?').bind(token).run();
 
+  // Read redirect from query param
+  const url = new URL(request.url);
+  const redirect = validateRedirectUrl(url.searchParams.get('redirect'));
+
   // Create session + JWT
-  return createSessionAndRedirect(link.user_id, link.email, request, env);
+  return createSessionAndRedirect(link.user_id, link.email, request, env, redirect);
 }
 
 // =========================================================================
@@ -253,6 +314,7 @@ async function handleVerifyCode(request, env) {
 
   const email = (body.email || '').trim().toLowerCase();
   const code = (body.code || '').trim();
+  const redirect = validateRedirectUrl(body.redirect);
 
   if (!email || !code || code.length !== 6) {
     return jsonResponse({ error: 'Email and 6-digit code required' }, 400);
@@ -302,7 +364,7 @@ async function handleVerifyCode(request, env) {
   });
 
   return jsonResponse(
-    { ok: true, redirect: '/' },
+    { ok: true, redirect: redirect || '/' },
     200,
     { 'Set-Cookie': sessionCookie(jwt) }
   );
@@ -471,6 +533,15 @@ async function handleAdmin(request, env, path, method) {
     return jsonResponse({ logs: rows.results });
   }
 
+  if (method === 'GET' && route === 'config') {
+    const rows = await env.DB.prepare('SELECT key, value FROM config ORDER BY key').all();
+    const config = {};
+    for (const row of rows.results) {
+      config[row.key] = row.value;
+    }
+    return jsonResponse({ config: config });
+  }
+
   if (method === 'POST' && route === 'config') {
     const body = await request.json();
     for (const [key, value] of Object.entries(body)) {
@@ -558,7 +629,7 @@ function base64urlDecode(str) {
 // SESSION HELPERS
 // =========================================================================
 
-async function createSessionAndRedirect(userId, email, request, env) {
+async function createSessionAndRedirect(userId, email, request, env, redirect) {
   const user = await env.DB.prepare('SELECT id, email, name, role FROM users WHERE id = ?').bind(userId).first();
   if (!user) return redirectWithError('User not found');
 
@@ -586,7 +657,7 @@ async function createSessionAndRedirect(userId, email, request, env) {
   return new Response(null, {
     status: 302,
     headers: {
-      'Location': '/',
+      'Location': redirect || '/',
       'Set-Cookie': sessionCookie(jwt),
     },
   });

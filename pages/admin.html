@@ -246,11 +246,24 @@
       });
   }
 
-  var ALL_PROJECTS = ['health', 'shield', 'ego-assessment'];
-  var PROJECT_LABELS = { health: 'Health', shield: 'Shield', 'ego-assessment': 'Ego' };
+  var ALL_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader'];
+  var PROJECT_LABELS = { health: 'Health', shield: 'Shield', 'ego-assessment': 'Ego', mindreader: 'Mind Reader' };
   var usersData = [];
+  var healthUsers = {}; // email -> {id, opus_enabled}
 
   function loadUsers() {
+    // Fetch health tracker users in parallel for opus badges
+    fetch('https://health.pragmaticdharma.org/admin/api/users', { credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(users) {
+        healthUsers = {};
+        users.forEach(function(u) {
+          if (u.email) healthUsers[u.email.toLowerCase()] = { id: u.id, opus_enabled: u.opus_enabled };
+        });
+      })
+      .catch(function() { healthUsers = {}; })
+      .finally(function() { renderUsers(); });
+
     fetch('/api/admin/users', { credentials: 'include' })
       .then(function(r) { return r.json(); })
       .then(function(data) {
@@ -260,28 +273,40 @@
           return;
         }
         usersData = data.users;
-        var html = '<table><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Role</th><th>Projects</th><th>Date</th></tr></thead><tbody>';
-        data.users.forEach(function(u, idx) {
-          var badges = '';
-          ALL_PROJECTS.forEach(function(p) {
-            var active = u.projects && u.projects.indexOf(p) !== -1;
-            badges += '<span class="project-badge ' + (active ? 'active' : 'inactive') + '" data-user-idx="' + idx + '" data-project="' + esc(p) + '" onclick="toggleProject(this)">' + esc(PROJECT_LABELS[p] || p) + '</span>';
-          });
-          html += '<tr>'
-            + '<td>' + esc(u.name) + '</td>'
-            + '<td>' + esc(u.email) + '</td>'
-            + '<td><span class="status-badge ' + esc(u.status) + '">' + esc(u.status) + '</span></td>'
-            + '<td>' + esc(u.role || 'user') + '</td>'
-            + '<td><div class="project-badges">' + badges + '</div></td>'
-            + '<td>' + formatDate(u.created_at) + '</td>'
-            + '</tr>';
-        });
-        html += '</tbody></table>';
-        section.innerHTML = html;
+        renderUsers();
       })
       .catch(function() {
         document.getElementById('users-section').innerHTML = '<p class="msg err">Failed to load users.</p>';
       });
+  }
+
+  function renderUsers() {
+    if (!usersData.length) return;
+    var section = document.getElementById('users-section');
+    var html = '<table><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Role</th><th>Projects</th><th>Date</th></tr></thead><tbody>';
+    usersData.forEach(function(u, idx) {
+      var badges = '';
+      ALL_PROJECTS.forEach(function(p) {
+        var active = u.projects && u.projects.indexOf(p) !== -1;
+        badges += '<span class="project-badge ' + (active ? 'active' : 'inactive') + '" data-user-idx="' + idx + '" data-project="' + esc(p) + '" onclick="toggleProject(this)">' + esc(PROJECT_LABELS[p] || p) + '</span>';
+      });
+      // Opus badge (from health tracker)
+      var hu = healthUsers[(u.email || '').toLowerCase()];
+      if (hu) {
+        var opusActive = hu.opus_enabled ? 'active' : 'inactive';
+        badges += '<span class="project-badge ' + opusActive + '" data-health-user-id="' + esc(hu.id) + '" onclick="toggleOpusHealth(this)" title="Opus model access (Health Tracker)">Opus</span>';
+      }
+      html += '<tr>'
+        + '<td>' + esc(u.name) + '</td>'
+        + '<td>' + esc(u.email) + '</td>'
+        + '<td><span class="status-badge ' + esc(u.status) + '">' + esc(u.status) + '</span></td>'
+        + '<td>' + esc(u.role || 'user') + '</td>'
+        + '<td><div class="project-badges">' + badges + '</div></td>'
+        + '<td>' + formatDate(u.created_at) + '</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table>';
+    section.innerHTML = html;
   }
 
   window.toggleProject = function(badge) {
@@ -320,6 +345,30 @@
             }
           });
         }
+      }
+    })
+    .catch(function() { badge.classList.remove('saving'); });
+  };
+
+  window.toggleOpusHealth = function(badge) {
+    var userId = badge.getAttribute('data-health-user-id');
+    if (!userId) return;
+    var enabling = badge.classList.contains('inactive');
+    badge.classList.add('saving');
+    fetch('https://health.pragmaticdharma.org/admin/api/users/' + userId + '/opus', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: enabling }),
+      credentials: 'include'
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+      badge.classList.remove('saving');
+      if (res.success) {
+        badge.className = 'project-badge ' + (res.opus_enabled ? 'active' : 'inactive');
+        // Update local cache
+        var email = Object.keys(healthUsers).find(function(e) { return healthUsers[e].id === userId; });
+        if (email) healthUsers[email].opus_enabled = res.opus_enabled;
       }
     })
     .catch(function() { badge.classList.remove('saving'); });

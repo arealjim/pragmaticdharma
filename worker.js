@@ -12,7 +12,7 @@ import SIGNUP_HTML from './pages/signup.html';
 import RESOURCES_HTML from './pages/resources.html';
 import ADMIN_HTML from './pages/admin.html';
 
-const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment'];
+const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader'];
 
 function validateRedirectUrl(url) {
   if (!url || typeof url !== 'string') return '';

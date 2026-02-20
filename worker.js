@@ -11,6 +11,7 @@ import LOGIN_HTML from './pages/login.html';
 import SIGNUP_HTML from './pages/signup.html';
 import RESOURCES_HTML from './pages/resources.html';
 import ADMIN_HTML from './pages/admin.html';
+import RETREATS_HTML from './pages/retreats.html';
 
 const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader'];
 
@@ -64,6 +65,12 @@ export default {
     // Health check
     if (path === '/health') {
       return new Response('ok', { headers: { 'content-type': 'text/plain' } });
+    }
+
+    // Subdomain routing: retreats.pragmaticdharma.org
+    const host = url.hostname;
+    if (host === 'retreats.pragmaticdharma.org') {
+      return htmlResponse(RETREATS_HTML);
     }
 
     try {

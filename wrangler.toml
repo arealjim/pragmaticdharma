@@ -9,7 +9,8 @@ globs = ["pages/*.html"]
 fallthrough = true
 
 routes = [
-  { pattern = "pragmaticdharma.org/*", zone_name = "pragmaticdharma.org" }
+  { pattern = "pragmaticdharma.org/*", zone_name = "pragmaticdharma.org" },
+  { pattern = "retreats.pragmaticdharma.org/*", zone_name = "pragmaticdharma.org" }
 ]
 
 # Secrets (set via `wrangler secret put <NAME>`):

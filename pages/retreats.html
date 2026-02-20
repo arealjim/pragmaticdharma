@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Retreat Finder — Meditation &amp; Contemplative Retreat Directory</title>
+  <style>
+    :root {
+      --bg: #faf9f7;
+      --card-bg: #fff;
+      --text: #2d2d2d;
+      --muted: #6b6b6b;
+      --accent: #5a7d5a;
+      --accent-light: #e8f0e8;
+      --border: #e5e2dd;
+      --shadow: 0 1px 3px rgba(0,0,0,0.06);
+      --radius: 10px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    header {
+      text-align: center;
+      padding: 3rem 1.5rem 2rem;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+
+    main {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 1.5rem 4rem;
+    }
+
+    .category {
+      margin-bottom: 2.5rem;
+    }
+
+    .category h2 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--accent-light);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.25rem;
+      text-decoration: none;
+      color: inherit;
+      display: block;
+      transition: box-shadow 0.15s, border-color 0.15s;
+    }
+
+    .card:hover {
+      box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+      border-color: var(--accent);
+    }
+
+    .card h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .card .location {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .card .desc {
+      font-size: 0.88rem;
+      color: #444;
+      line-height: 1.5;
+    }
+
+    .tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 500;
+      padding: 0.15em 0.5em;
+      border-radius: 4px;
+      background: var(--accent-light);
+      color: var(--accent);
+      margin-left: 0.4em;
+      vertical-align: middle;
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 600px) {
+      header { padding: 2rem 1rem 1.5rem; }
+      header h1 { font-size: 1.5rem; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Retreat Finder</h1>
+  <p>A curated directory of meditation and contemplative retreat sources</p>
+</header>
+
+<main>
+
+  <!-- Aggregators -->
+  <section class="category">
+    <h2>Aggregators &amp; Marketplaces</h2>
+    <div class="grid">
+      <a class="card" href="https://retreat.guru" target="_blank" rel="noopener">
+        <h3>Retreat Guru</h3>
+        <div class="location">Global</div>
+        <div class="desc">The largest retreat directory with 3,000+ centers worldwide. Search by tradition, location, date, and price. Centers self-list.</div>
+      </a>
+      <a class="card" href="https://www.bookretreats.com" target="_blank" rel="noopener">
+        <h3>BookRetreats</h3>
+        <div class="location">Global</div>
+        <div class="desc">Booking marketplace with 5,000+ retreats. Includes reviews, price comparisons, and detailed inclusions lists. Trip-advisor-style experience.</div>
+      </a>
+      <a class="card" href="https://www.bookyogaretreats.com" target="_blank" rel="noopener">
+        <h3>BookYogaRetreats</h3>
+        <div class="location">Global</div>
+        <div class="desc">Large yoga and meditation retreat booking platform. Sister site to BookMeditationRetreats. Filters by destination, style, and duration.</div>
+      </a>
+      <a class="card" href="https://insighttimer.com/retreats" target="_blank" rel="noopener">
+        <h3>Insight Timer Retreats</h3>
+        <div class="location">Global</div>
+        <div class="desc">Retreat directory within the popular meditation app. Teachers list their own retreats. Broad traditions from secular mindfulness to vipassana.</div>
+      </a>
+      <a class="card" href="https://www.retreatsonline.com" target="_blank" rel="noopener">
+        <h3>Retreats Online</h3>
+        <div class="location">Primarily US</div>
+        <div class="desc">Directory covering yoga, meditation, wellness, and spiritual retreats. Searchable by location, type, and date.</div>
+      </a>
+      <a class="card" href="https://www.dharma.org" target="_blank" rel="noopener">
+        <h3>dharma.org</h3>
+        <div class="location">US Insight centers</div>
+        <div class="desc">Cross-center calendar aggregating retreats from IMS, Spirit Rock, and affiliated Insight Meditation centers. Clean, structured data.</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Vipassana / Insight -->
+  <section class="category">
+    <h2>Vipassana &amp; Insight Meditation</h2>
+    <div class="grid">
+      <a class="card" href="https://www.dhamma.org" target="_blank" rel="noopener">
+        <h3>Dhamma.org <span class="tag">Dana</span></h3>
+        <div class="location">200+ centers worldwide</div>
+        <div class="desc">S.N. Goenka's global Vipassana network. Standardized 10-day courses, all donation-based. The single largest source of structured retreat data.</div>
+      </a>
+      <a class="card" href="https://www.dharma.org/ims/" target="_blank" rel="noopener">
+        <h3>Insight Meditation Society</h3>
+        <div class="location">Barre, MA</div>
+        <div class="desc">Premier US insight meditation center. Residential retreats from weekends to 3 months. Teachers include Joseph Goldstein and Sharon Salzberg.</div>
+      </a>
+      <a class="card" href="https://www.spiritrock.org" target="_blank" rel="noopener">
+        <h3>Spirit Rock</h3>
+        <div class="location">Woodacre, CA</div>
+        <div class="desc">Major West Coast insight center. Residential and day-long programs. Teachers include Jack Kornfield. Offers BIPOC and young adult retreats.</div>
+      </a>
+      <a class="card" href="https://www.insightretreatcenter.org" target="_blank" rel="noopener">
+        <h3>Insight Retreat Center</h3>
+        <div class="location">Santa Cruz, CA</div>
+        <div class="desc">Dedicated insight meditation retreat center in the Santa Cruz mountains. Offers silent residential retreats in the Theravada tradition.</div>
+      </a>
+      <a class="card" href="https://cloudmountain.org" target="_blank" rel="noopener">
+        <h3>Cloud Mountain</h3>
+        <div class="location">Castle Rock, WA</div>
+        <div class="desc">Multi-tradition retreat center in the Pacific Northwest. Hosts teachers from insight, Zen, Tibetan, and other contemplative traditions.</div>
+      </a>
+      <a class="card" href="https://southerndharma.org" target="_blank" rel="noopener">
+        <h3>Southern Dharma</h3>
+        <div class="location">Hot Springs, NC</div>
+        <div class="desc">Retreat center in the Blue Ridge Mountains. Multi-tradition programming including insight meditation, Zen, and yoga.</div>
+      </a>
+      <a class="card" href="https://www.gaiahouse.co.uk" target="_blank" rel="noopener">
+        <h3>Gaia House</h3>
+        <div class="location">Devon, UK</div>
+        <div class="desc">Major UK insight meditation center. Full retreat calendar with renowned international teachers. Silent residential retreats.</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Zen / Chan -->
+  <section class="category">
+    <h2>Zen &amp; Chan</h2>
+    <div class="grid">
+      <a class="card" href="https://plumvillage.org" target="_blank" rel="noopener">
+        <h3>Plum Village</h3>
+        <div class="location">France, US, Asia</div>
+        <div class="desc">Thich Nhat Hanh's global network of monasteries and practice centers. Mindfulness retreats with an emphasis on community and engaged Buddhism.</div>
+      </a>
+      <a class="card" href="https://www.sfzc.org" target="_blank" rel="noopener">
+        <h3>San Francisco Zen Center</h3>
+        <div class="location">San Francisco, CA</div>
+        <div class="desc">One of the oldest US Zen centers. Three locations: City Center, Green Gulch Farm, and Tassajara (remote mountain monastery with summer guest season).</div>
+      </a>
+      <a class="card" href="https://zmm.org" target="_blank" rel="noopener">
+        <h3>Zen Mountain Monastery</h3>
+        <div class="location">Mt. Tremper, NY</div>
+        <div class="desc">Mountains and Rivers Order. Offers sesshins (intensive Zen retreats), introductory weekends, and residency programs in the Catskill Mountains.</div>
+      </a>
+      <a class="card" href="https://www.upaya.org" target="_blank" rel="noopener">
+        <h3>Upaya Zen Center</h3>
+        <div class="location">Santa Fe, NM</div>
+        <div class="desc">Zen center founded by Roshi Joan Halifax. Programs bridging Zen practice with social action, chaplaincy, and end-of-life care.</div>
+      </a>
+      <a class="card" href="https://www.dharmadrumretreat.org" target="_blank" rel="noopener">
+        <h3>Dharma Drum Retreat Center</h3>
+        <div class="location">Pine Bush, NY</div>
+        <div class="desc">Chan (Chinese Zen) tradition founded by Master Sheng Yen. Silent illumination and huatou retreats from beginner to advanced level.</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Tibetan -->
+  <section class="category">
+    <h2>Tibetan Buddhism</h2>
+    <div class="grid">
+      <a class="card" href="https://www.shambhala.org" target="_blank" rel="noopener">
+        <h3>Shambhala</h3>
+        <div class="location">200+ centers worldwide</div>
+        <div class="desc">Global network offering meditation programs rooted in the Shambhala Buddhist tradition. Structured path from beginner through advanced practice.</div>
+      </a>
+      <a class="card" href="https://fpmt.org" target="_blank" rel="noopener">
+        <h3>FPMT</h3>
+        <div class="location">160+ centers worldwide</div>
+        <div class="desc">Foundation for the Preservation of the Mahayana Tradition. Gelug Tibetan Buddhist centers with study programs and meditation retreats.</div>
+      </a>
+      <a class="card" href="https://tergar.org" target="_blank" rel="noopener">
+        <h3>Tergar</h3>
+        <div class="location">Global</div>
+        <div class="desc">Mingyur Rinpoche's meditation community. Joy of Living program and retreat offerings blending traditional Tibetan practice with modern accessibility.</div>
+      </a>
+      <a class="card" href="https://www.taramandala.org" target="_blank" rel="noopener">
+        <h3>Tara Mandala</h3>
+        <div class="location">Pagosa Springs, CO</div>
+        <div class="desc">Nyingma Tibetan Buddhist retreat center founded by Lama Tsultrim Allione. Dakini practices, Chod, and meditation retreats in a mountain setting.</div>
+      </a>
+      <a class="card" href="https://www.dralamountain.org" target="_blank" rel="noopener">
+        <h3>Drala Mountain Center</h3>
+        <div class="location">Red Feather Lakes, CO</div>
+        <div class="desc">Formerly Shambhala Mountain Center. Multi-tradition retreat center in the Rockies. Meditation, yoga, and contemplative arts programs year-round.</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Theravada Monasteries -->
+  <section class="category">
+    <h2>Theravada Monasteries</h2>
+    <div class="grid">
+      <a class="card" href="https://www.abhayagiri.org" target="_blank" rel="noopener">
+        <h3>Abhayagiri <span class="tag">Dana</span></h3>
+        <div class="location">Redwood Valley, CA</div>
+        <div class="desc">Thai Forest tradition monastery in Ajahn Chah's lineage. Offers periodic guest retreats and a monastic residency program. Fully donation-based.</div>
+      </a>
+      <a class="card" href="https://amaravati.org" target="_blank" rel="noopener">
+        <h3>Amaravati <span class="tag">Dana</span></h3>
+        <div class="location">Hertfordshire, UK</div>
+        <div class="desc">Thai Forest monastery in Ajahn Chah's lineage. Group and family retreats, day visits, and monastic life. All offerings are free.</div>
+      </a>
+      <a class="card" href="https://birken.ca" target="_blank" rel="noopener">
+        <h3>Birken Forest Monastery <span class="tag">Dana</span></h3>
+        <div class="location">British Columbia, Canada</div>
+        <div class="desc">Thai Forest Theravada monastery in a remote forest setting. Silent retreats, monastic visits, and personal retreat stays.</div>
+      </a>
+      <a class="card" href="https://www.bhavanasociety.org" target="_blank" rel="noopener">
+        <h3>Bhavana Society <span class="tag">Dana</span></h3>
+        <div class="location">High View, WV</div>
+        <div class="desc">Theravada forest monastery and retreat center founded by Bhante Gunaratana. Meditation retreats and personal retreat opportunities.</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Multi-Tradition / Wellness -->
+  <section class="category">
+    <h2>Multi-Tradition &amp; Wellness Centers</h2>
+    <div class="grid">
+      <a class="card" href="https://www.eomega.org" target="_blank" rel="noopener">
+        <h3>Omega Institute</h3>
+        <div class="location">Rhinebeck, NY</div>
+        <div class="desc">Major holistic learning center on 250 acres. Hundreds of workshops and retreats spanning meditation, yoga, wellness, creativity, and personal growth.</div>
+      </a>
+      <a class="card" href="https://kripalu.org" target="_blank" rel="noopener">
+        <h3>Kripalu Center</h3>
+        <div class="location">Stockbridge, MA</div>
+        <div class="desc">One of the largest yoga and wellness retreat centers in North America. Year-round programs from yoga teacher training to mindfulness retreats.</div>
+      </a>
+      <a class="card" href="https://www.esalen.org" target="_blank" rel="noopener">
+        <h3>Esalen Institute</h3>
+        <div class="location">Big Sur, CA</div>
+        <div class="desc">Iconic human potential center on the Pacific coast. Workshops blending meditation, bodywork, psychology, and the arts since 1962.</div>
+      </a>
+      <a class="card" href="https://artoflivingretreatcenter.org" target="_blank" rel="noopener">
+        <h3>Art of Living Retreat Center</h3>
+        <div class="location">Boone, NC</div>
+        <div class="desc">Blue Ridge Mountain retreat center. Breathwork, meditation, yoga, and Ayurveda programs rooted in the Art of Living tradition.</div>
+      </a>
+      <a class="card" href="https://www.garrisoninstitute.org" target="_blank" rel="noopener">
+        <h3>Garrison Institute</h3>
+        <div class="location">Garrison, NY</div>
+        <div class="desc">Multi-tradition venue in the Hudson Valley that hosts retreats from many different teachers and organizations. Focus on contemplative practice and social change.</div>
+      </a>
+      <a class="card" href="https://www.hollyhock.ca" target="_blank" rel="noopener">
+        <h3>Hollyhock</h3>
+        <div class="location">Cortes Island, BC, Canada</div>
+        <div class="desc">Retreat center on a remote island off British Columbia. Programs in mindfulness, leadership, yoga, and creative expression.</div>
+      </a>
+      <a class="card" href="https://1440.org" target="_blank" rel="noopener">
+        <h3>1440 Multiversity</h3>
+        <div class="location">Scotts Valley, CA</div>
+        <div class="desc">Modern retreat campus in the redwoods. Programs with leading thinkers in mindfulness, wellness, relationships, and personal development.</div>
+      </a>
+      <a class="card" href="https://vallecitos.org" target="_blank" rel="noopener">
+        <h3>Vallecitos Mountain Retreat</h3>
+        <div class="location">Taos, NM</div>
+        <div class="desc">Contemplative retreat center in the Carson National Forest. Multi-tradition programming with an emphasis on nature, silence, and social justice.</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Pragmatic Dharma / Individual Teachers -->
+  <section class="category">
+    <h2>Individual Teachers</h2>
+    <div class="grid">
+      <a class="card" href="https://meditatewithtucker.com/retreats" target="_blank" rel="noopener">
+        <h3>Meditate with Tucker</h3>
+        <div class="location">Various US locations</div>
+        <div class="desc">Tucker Peck's retreat schedule. Pragmatic dharma and insight meditation retreats with a focus on direct experience and clear instruction.</div>
+      </a>
+      <a class="card" href="https://tarabrach.com" target="_blank" rel="noopener">
+        <h3>Tara Brach</h3>
+        <div class="location">Washington, DC area</div>
+        <div class="desc">Psychologist and meditation teacher offering retreats on mindfulness and self-compassion. Author of Radical Acceptance.</div>
+      </a>
+      <a class="card" href="https://www.shinzenyoung.com" target="_blank" rel="noopener">
+        <h3>Shinzen Young</h3>
+        <div class="location">Various / Online</div>
+        <div class="desc">Unified Mindfulness system. Retreats combining scientific rigor with contemplative depth. Known for systematic meditation techniques.</div>
+      </a>
+      <a class="card" href="https://leighb.com" target="_blank" rel="noopener">
+        <h3>Leigh Brasington</h3>
+        <div class="location">Various US/Europe</div>
+        <div class="desc">Specialist in jhana (deep concentration) practice. Retreats focused on developing the meditative absorptions described in the Pali Canon.</div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Directories & Resources -->
+  <section class="category">
+    <h2>Directories &amp; Resources</h2>
+    <div class="grid">
+      <a class="card" href="https://www.buddhanet.net" target="_blank" rel="noopener">
+        <h3>BuddhaNet</h3>
+        <div class="location">Global</div>
+        <div class="desc">Long-running Buddhist information network. Global directory of centers organized by country and tradition. Some listings may be dated.</div>
+      </a>
+      <a class="card" href="https://www.dharmanet.org" target="_blank" rel="noopener">
+        <h3>DharmaNet</h3>
+        <div class="location">Primarily US</div>
+        <div class="desc">Buddhist information network with a center and retreat directory focused on North American offerings.</div>
+      </a>
+      <a class="card" href="https://www.thebuddhistsociety.org" target="_blank" rel="noopener">
+        <h3>The Buddhist Society</h3>
+        <div class="location">UK</div>
+        <div class="desc">Directory of UK Buddhist centers and retreats across all traditions. The oldest Buddhist organization in Europe, founded 1924.</div>
+      </a>
+      <a class="card" href="https://www.dharmaoverground.org" target="_blank" rel="noopener">
+        <h3>Dharma Overground</h3>
+        <div class="location">Online community</div>
+        <div class="desc">Pragmatic dharma discussion forum. Not a listing site, but a rich source of retreat recommendations and reviews from experienced practitioners.</div>
+      </a>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Retreat Finder &mdash; a personal project to help people find meditation retreats.
+</footer>
+
+</body>
+</html>

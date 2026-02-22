@@ -98,6 +98,10 @@
       <span class="toggle-label">Ego Assessment</span>
       <label class="toggle-switch"><input type="checkbox" id="beta-ego-assessment" onchange="toggleBeta('open_beta:ego-assessment',this.checked)"><span class="toggle-slider"></span></label>
     </div>
+    <div class="toggle-row">
+      <span class="toggle-label">Mind Reader</span>
+      <label class="toggle-switch"><input type="checkbox" id="beta-mindreader" onchange="toggleBeta('open_beta:mindreader',this.checked)"><span class="toggle-slider"></span></label>
+    </div>
   </div>
 
   <h2>Project Stats</h2>
@@ -116,6 +120,7 @@
 
   <h2>All Users</h2>
   <div id="users-section"><span class="loading">Loading...</span></div>
+  <p style="color:var(--muted);font-size:0.8rem;margin-top:0.5rem;">Project access changes take effect on the user's next login. Active sessions retain current access until JWT expires.</p>
 </div>
 
 <script>
@@ -146,6 +151,7 @@
         el = document.getElementById('beta-health'); if (el) el.checked = c['open_beta:health'] === 'true';
         el = document.getElementById('beta-shield'); if (el) el.checked = c['open_beta:shield'] === 'true';
         el = document.getElementById('beta-ego-assessment'); if (el) el.checked = c['open_beta:ego-assessment'] === 'true';
+        el = document.getElementById('beta-mindreader'); if (el) el.checked = c['open_beta:mindreader'] === 'true';
       });
   }
 

@@ -91,3 +91,36 @@ Then in templates:
 {% endif %}
 <!-- paste nav-bar.html content here, with PROJECT_NAME already replaced -->
 ```
+
+## Per-Project Access Gating
+
+All sub-projects enforce per-project access via the `projects` claim in the JWT. The `hasProjectAccess()` / `has_project_access()` function checks this:
+
+- **No `projects` claim** → access granted (backward-compat with old JWTs)
+- **`projects: ['shield', 'health']`** → access granted only to listed projects
+- **`projects: []`** → access denied to all projects
+
+### Auth Styles
+
+Projects implement one of two auth gate patterns:
+
+| Style | Behavior | Used by |
+|-------|----------|---------|
+| **worker-gate** | Middleware intercepts all requests. Unauthenticated → 302 redirect to login. Valid JWT but wrong project → 403. | shield, mindreader |
+| **api-gate** | Auth checked per-endpoint. Project-denied collapses to unauthenticated (401 on API routes, 302 on HTML routes). | ego-assessment, health |
+
+The distinction matters for error handling: `worker-gate` projects return a clear 403 with a message, while `api-gate` projects treat missing project access the same as no auth (the user's `get_current_user()` returns null).
+
+### Admin Page
+
+Project access is managed at `pragmaticdharma.org/admin` via per-user badge toggles. Changes update the user's `projects` array in D1 but **take effect on next login** — active sessions retain current JWT claims until expiry (30 days).
+
+## Auth Enforcement Tests
+
+`test-auth.js` in the pragmaticdharma repo verifies auth enforcement across all subdomains. Run after any auth-related deployment:
+
+```bash
+JWT_SECRET=<value> node test-auth.js
+```
+
+Tests 7 scenarios per site (28 total), exits with code 1 on failure.

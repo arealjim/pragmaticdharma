@@ -138,6 +138,9 @@ export default {
       if (method === 'GET' && path === '/api/session') {
         return handleSession(request, env);
       }
+      if (method === 'GET' && path === '/api/refresh-session') {
+        return handleRefreshSession(request, env);
+      }
       if (method === 'GET' && path === '/api/logout') {
         return handleLogout(request, env);
       }
@@ -428,6 +431,53 @@ async function handleSession(request, env) {
       name: payload.name,
       role: payload.role,
     }
+  });
+}
+
+// =========================================================================
+// REFRESH SESSION (re-issue JWT with fresh projects from DB)
+// =========================================================================
+
+async function handleRefreshSession(request, env) {
+  const loginBase = 'https://pragmaticdharma.org/login';
+  const redirect = validateRedirectUrl(new URL(request.url).searchParams.get('redirect'));
+
+  const jwt = getJWTFromCookie(request);
+  if (!jwt) {
+    const loginUrl = redirect ? `${loginBase}?redirect=${encodeURIComponent(redirect)}` : loginBase;
+    return Response.redirect(loginUrl, 302);
+  }
+
+  const payload = await verifyJWT(env, jwt);
+  if (!payload) {
+    const loginUrl = redirect ? `${loginBase}?redirect=${encodeURIComponent(redirect)}` : loginBase;
+    return Response.redirect(loginUrl, 302);
+  }
+
+  // Re-read user + projects from DB
+  const user = await env.DB.prepare('SELECT id, email, name, role FROM users WHERE id = ?').bind(payload.sub).first();
+  if (!user) {
+    const loginUrl = redirect ? `${loginBase}?redirect=${encodeURIComponent(redirect)}` : loginBase;
+    return Response.redirect(loginUrl, 302);
+  }
+
+  const projectRows = await env.DB.prepare('SELECT project FROM user_projects WHERE user_id = ?').bind(user.id).all();
+  const projects = projectRows.results.map(function(r) { return r.project; });
+
+  const newJwt = await signJWT(env, {
+    sub: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    projects: projects,
+  });
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      'Location': redirect || '/',
+      'Set-Cookie': sessionCookie(newJwt),
+    },
   });
 }
 

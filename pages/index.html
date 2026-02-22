@@ -17,9 +17,6 @@
   .header h1 { font-size: 2rem; font-weight: 300; letter-spacing: 0.05em; color: var(--accent); margin-bottom: 0.5rem; }
   .header p { color: var(--muted); font-size: 1.05rem; max-width: 600px; margin: 0 auto; }
 
-  .user-bar { text-align: center; margin-bottom: 2rem; font-size: 0.9rem; color: var(--muted); }
-  .user-bar a { margin: 0 0.5rem; }
-
   .intro { max-width: 700px; margin: 0 auto 2.5rem; padding: 0 2rem; text-align: center; }
   .intro p { color: var(--muted); font-size: 0.95rem; margin-bottom: 0.75rem; }
 
@@ -49,8 +46,6 @@
   <p>Tools and resources for contemplative practice, personal development, and situational awareness.</p>
 </div>
 
-<div class="user-bar" id="user-bar"></div>
-
 <div class="intro">
   <p>This is a small collection of projects built around a pragmatic approach to dharma practice &mdash; treating meditation and self-development as skills that can be trained and measured, not just philosophized about.</p>
 </div>
@@ -72,7 +67,7 @@
     </div>
   </a>
 
-  <a class="card-link" href="https://ego-assessment.pages.dev">
+  <a class="card-link" href="https://psychology.pragmaticdharma.org">
     <div class="card">
       <h3>Ego Development</h3>
       <p>Interactive assessment based on Loevinger/Cook-Greuter ego development theory. Map your current stage and explore developmental edges.</p>
@@ -109,29 +104,5 @@
   <p>Built by <a href="mailto:james.ronan.us@gmail.com">Jim</a></p>
 </div>
 
-<script>
-(function() {
-  fetch('/api/session', { credentials: 'include' })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      var bar = document.getElementById('user-bar');
-      if (data && data.user) {
-        bar.innerHTML = 'Signed in as <strong style="color:#e0e0e0">' + escapeHtml(data.user.name) + '</strong> &middot; <a href="/api/logout">Sign out</a>';
-        if (data.user.role === 'admin') {
-          bar.innerHTML += ' &middot; <a href="/admin">Admin</a>';
-        }
-      } else {
-        bar.innerHTML = '<a href="/login">Sign in</a> &middot; <a href="/signup">Request access</a>';
-      }
-    })
-    .catch(function() {});
-
-  function escapeHtml(s) {
-    var d = document.createElement('div');
-    d.textContent = s;
-    return d.innerHTML;
-  }
-})();
-</script>
 </body>
 </html>

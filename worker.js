@@ -12,6 +12,7 @@ import SIGNUP_HTML from './pages/signup.html';
 import RESOURCES_HTML from './pages/resources.html';
 import ADMIN_HTML from './pages/admin.html';
 import RETREATS_HTML from './pages/retreats.html';
+import NAV_BAR_HTML from './shared/nav-bar.html';
 
 const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader'];
 
@@ -29,6 +30,7 @@ function redirectUrlToProject(url) {
     'health.pragmaticdharma.org': 'health',
     'shield.pragmaticdharma.org': 'shield',
     'psychology.pragmaticdharma.org': 'ego-assessment',
+    'mindreader.pragmaticdharma.org': 'mindreader',
   };
   try {
     const host = new URL(url).hostname;
@@ -46,6 +48,30 @@ const HTML_HEADERS = {
   'x-frame-options': 'DENY',
   'strict-transport-security': 'max-age=63072000; includeSubDomains',
 };
+
+// =========================================================================
+// PLATFORM NAV BAR INJECTION
+// =========================================================================
+
+async function injectPlatformNav(html, request, env, projectName) {
+  const navHtml = NAV_BAR_HTML.replace('{{PROJECT_NAME}}', projectName);
+  let userScript = '';
+
+  const jwt = getJWTFromCookie(request);
+  if (jwt) {
+    const payload = await verifyJWT(env, jwt);
+    if (payload) {
+      const userData = JSON.stringify({
+        name: payload.name || '',
+        email: payload.email || '',
+        role: payload.role || '',
+      });
+      userScript = `<script>window.__PD_USER=${userData};</script>`;
+    }
+  }
+
+  return html.replace('</body>', userScript + navHtml + '</body>');
+}
 
 // =========================================================================
 // MAIN HANDLER
@@ -70,16 +96,19 @@ export default {
     // Subdomain routing: retreats.pragmaticdharma.org
     const host = url.hostname;
     if (host === 'retreats.pragmaticdharma.org') {
-      return htmlResponse(RETREATS_HTML);
+      const injected = await injectPlatformNav(RETREATS_HTML, request, env, 'Retreat Finder');
+      return htmlResponse(injected);
     }
 
     try {
       // Static pages
       if (method === 'GET' && (path === '/' || path === '')) {
-        return htmlResponse(INDEX_HTML);
+        const injected = await injectPlatformNav(INDEX_HTML, request, env, 'Pragmatic Dharma');
+        return htmlResponse(injected);
       }
       if (method === 'GET' && path === '/resources') {
-        return htmlResponse(RESOURCES_HTML);
+        const injected = await injectPlatformNav(RESOURCES_HTML, request, env, 'Resources');
+        return htmlResponse(injected);
       }
       if (method === 'GET' && path === '/login') {
         return htmlResponse(LOGIN_HTML);
@@ -88,7 +117,8 @@ export default {
         return htmlResponse(SIGNUP_HTML);
       }
       if (method === 'GET' && path === '/admin') {
-        return htmlResponse(ADMIN_HTML);
+        const injected = await injectPlatformNav(ADMIN_HTML, request, env, 'Admin');
+        return htmlResponse(injected);
       }
 
       // Auth API

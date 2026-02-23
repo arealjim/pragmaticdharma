@@ -33,6 +33,10 @@ npm run db:migrate       # Apply schema.sql to remote D1
 4. User verifies via code (`POST /api/verify`) or clicks link (`GET /api/verify/:token`)
 5. JWT cookie set on `.pragmaticdharma.org`, 30-day expiry
 
+### Session refresh
+
+Project access changes (via admin dashboard or `user-projects` API) take effect immediately thanks to the `GET /api/refresh-session` endpoint. When a sub-project middleware detects a valid JWT that lacks the required project, it redirects to this endpoint, which re-reads projects from D1 and re-issues the JWT — transparent to the user.
+
 ## Sub-Projects
 
 | Subdomain | Worker/App | Auth | Auth Style |
@@ -82,7 +86,8 @@ JWT_SECRET=<value> node test-auth.js
 Tests 7 scenarios per subdomain (28 total): no cookie, expired JWT, missing project, valid access, malformed JWT, backward-compat (no projects claim), empty projects array.
 
 Two auth styles are tested:
-- **worker-gate** (shield, mindreader): unauthenticated → 302 redirect, wrong project → 403
+- **worker-gate** (shield): unauthenticated → 302 redirect, wrong project → 403
+- **worker-gate** (mindreader): unauthenticated → 302 redirect, wrong project → 302 to `/api/refresh-session` (re-issues JWT), then 403 if still denied
 - **api-gate** (ego-assessment, health): all auth failures → 401 (project-denied = unauthenticated at API level)
 
 ## Code Conventions

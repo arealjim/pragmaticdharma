@@ -179,11 +179,13 @@ async function main() {
   }
 
   console.log(`${COLORS.bold}Auth Enforcement Tests${COLORS.reset}`);
-  console.log(`${COLORS.dim}Testing 4 sites × 7 scenarios = 28 tests${COLORS.reset}`);
+  console.log(`${COLORS.dim}Testing 6 sites × 7 scenarios = 42 tests${COLORS.reset}`);
 
   const sites = [
     { name: 'Psychic Shield', url: 'https://shield.pragmaticdharma.org/', projectKey: 'shield', authStyle: 'worker-gate' },
     { name: 'Mind Reader', url: 'https://mindreader.pragmaticdharma.org/', projectKey: 'mindreader', authStyle: 'worker-gate' },
+    { name: 'PsychTools', url: 'https://psychtools.pragmaticdharma.org/', projectKey: 'psychtools', authStyle: 'worker-gate' },
+    { name: 'Transit Viewer', url: 'https://astrology.pragmaticdharma.org/', projectKey: 'astrology', authStyle: 'worker-gate' },
     { name: 'Ego Assessment', url: 'https://psychology.pragmaticdharma.org/api/profile', projectKey: 'ego-assessment', authStyle: 'api-gate' },
     { name: 'Health Tracker', url: 'https://health.pragmaticdharma.org/api/mood/trends', projectKey: 'health', authStyle: 'api-gate' },
   ];

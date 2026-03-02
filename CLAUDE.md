@@ -46,11 +46,12 @@ Project access changes (via admin dashboard or `user-projects` API) take effect 
 | health.pragmaticdharma.org | tcm-tracker (Flask via cloudflared tunnel) | JWT SSO (replaces password auth) | api-gate (401) |
 | psychology.pragmaticdharma.org | ego-assessment (Cloudflare Pages) | JWT SSO + existing magic link auth | api-gate (401) |
 | ego-assessment.pages.dev | ego-assessment (Cloudflare Pages) | Magic link auth only (no SSO cookie on this domain) | — |
+| astrology.pragmaticdharma.org | astrology (Cloudflare Pages + local Claude proxy) | JWT SSO | worker-gate (302/403) |
 
 ## Secrets
 
 Set via `wrangler secret put <NAME>`:
-- `JWT_SECRET` — HMAC-SHA256 signing key (32 hex bytes), shared across all 5 services (pragmaticdharma, psychic-shield, ego-assessment, mind-reader, tcm-tracker)
+- `JWT_SECRET` — HMAC-SHA256 signing key (32 hex bytes), shared across all 6 services (pragmaticdharma, psychic-shield, ego-assessment, mind-reader, tcm-tracker, astrology). Stored in `~/workspace/credentials.kdbx`
 - `RESEND_API_KEY` — Resend transactional email API key
 - `DISCORD_WEBHOOK_URL` — Discord webhook for signup/access notifications
 
@@ -62,7 +63,7 @@ schema.sql          # D1 schema (users, magic_links, sessions, access_logs, conf
 wrangler.toml       # Worker config + D1 binding
 package.json        # Wrangler dev dependency
 pd                  # Admin CLI (bash, wraps wrangler d1 execute)
-test-auth.js        # Auth enforcement integration tests (28 tests across all subdomains)
+test-auth.js        # Auth enforcement integration tests (42 tests across all subdomains)
 pages/
   index.html        # Landing page (project cards)
   login.html        # Login form (email + 6-digit code)
@@ -77,13 +78,13 @@ shared/
 
 ## Testing
 
-Auth enforcement integration tests verify that all 4 subdomains correctly grant/deny access based on JWT `projects` claims.
+Auth enforcement integration tests verify that all 6 subdomains correctly grant/deny access based on JWT `projects` claims.
 
 ```bash
 JWT_SECRET=<value> node test-auth.js
 ```
 
-Tests 7 scenarios per subdomain (28 total): no cookie, expired JWT, missing project, valid access, malformed JWT, backward-compat (no projects claim), empty projects array.
+Tests 7 scenarios per subdomain (42 total): no cookie, expired JWT, missing project, valid access, malformed JWT, backward-compat (no projects claim), empty projects array.
 
 Two auth styles are tested:
 - **worker-gate** (shield): unauthenticated → 302 redirect, wrong project → 403

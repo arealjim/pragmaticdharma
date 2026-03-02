@@ -102,6 +102,10 @@
       <span class="toggle-label">Mind Reader</span>
       <label class="toggle-switch"><input type="checkbox" id="beta-mindreader" onchange="toggleBeta('open_beta:mindreader',this.checked)"><span class="toggle-slider"></span></label>
     </div>
+    <div class="toggle-row">
+      <span class="toggle-label">PsychTools</span>
+      <label class="toggle-switch"><input type="checkbox" id="beta-psychtools" onchange="toggleBeta('open_beta:psychtools',this.checked)"><span class="toggle-slider"></span></label>
+    </div>
   </div>
 
   <h2>Project Stats</h2>
@@ -152,6 +156,7 @@
         el = document.getElementById('beta-shield'); if (el) el.checked = c['open_beta:shield'] === 'true';
         el = document.getElementById('beta-ego-assessment'); if (el) el.checked = c['open_beta:ego-assessment'] === 'true';
         el = document.getElementById('beta-mindreader'); if (el) el.checked = c['open_beta:mindreader'] === 'true';
+        el = document.getElementById('beta-psychtools'); if (el) el.checked = c['open_beta:psychtools'] === 'true';
       });
   }
 
@@ -252,8 +257,8 @@
       });
   }
 
-  var ALL_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader'];
-  var PROJECT_LABELS = { health: 'Health', shield: 'Shield', 'ego-assessment': 'Ego', mindreader: 'Mind Reader' };
+  var ALL_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'radio', 'practice'];
+  var PROJECT_LABELS = { health: 'Health', shield: 'Shield', 'ego-assessment': 'Ego', mindreader: 'Mind Reader', psychtools: 'PsychTools', astrology: 'Astrology', radio: 'Radio', practice: 'Practice' };
   var usersData = [];
   var healthUsers = {}; // email -> {id, opus_enabled}
 

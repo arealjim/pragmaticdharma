@@ -14,7 +14,7 @@ import ADMIN_HTML from './pages/admin.html';
 import RETREATS_HTML from './pages/retreats.html';
 import NAV_BAR_HTML from './shared/nav-bar.html';
 
-const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader'];
+const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'radio', 'practice'];
 
 function validateRedirectUrl(url) {
   if (!url || typeof url !== 'string') return '';
@@ -31,6 +31,10 @@ function redirectUrlToProject(url) {
     'shield.pragmaticdharma.org': 'shield',
     'psychology.pragmaticdharma.org': 'ego-assessment',
     'mindreader.pragmaticdharma.org': 'mindreader',
+    'psychtools.pragmaticdharma.org': 'psychtools',
+    'astrology.pragmaticdharma.org': 'astrology',
+    'radio.pragmaticdharma.org': 'radio',
+    'practice.pragmaticdharma.org': 'practice',
   };
   try {
     const host = new URL(url).hostname;

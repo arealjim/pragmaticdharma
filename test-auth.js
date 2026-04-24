@@ -166,6 +166,71 @@ async function testSite(name, url, projectKey, secret, authStyle) {
   return { passed, failed, results };
 }
 
+/**
+ * Critical-endpoint auth tests for ego-development-app-api.
+ *
+ * Targets endpoints identified in the 2026-04-23 security review as
+ * unauthenticated when they must not be. These tests assert the fix contract:
+ * every unauthenticated call to these endpoints must return 401.
+ */
+async function testEgoCriticals() {
+  console.log(`\n${COLORS.cyan}${COLORS.bold}Ego Assessment — Critical unauth endpoints${COLORS.reset}`);
+  let passed = 0;
+  let failed = 0;
+
+  async function requireStatus(label, method, url, body, expected) {
+    try {
+      const opts = { method, headers: {}, redirect: 'manual' };
+      if (body !== undefined) {
+        opts.headers['Content-Type'] = 'application/json';
+        opts.body = JSON.stringify(body);
+      }
+      const resp = await fetch(url, opts);
+      const status = resp.status;
+      if (statusMatches(status, expected)) {
+        console.log(pass(`${label} → ${status}`));
+        passed++;
+      } else {
+        console.log(fail(`${label} → ${status}`, `expected ${expected.join('|')}`));
+        failed++;
+      }
+    } catch (err) {
+      console.log(fail(`${label} → ERROR`, err.message));
+      failed++;
+    }
+  }
+
+  // C2 — stem-stats POST must require auth (empty scores avoids any DB mutation)
+  await requireStatus(
+    'POST /api/stem-stats (no cookie)',
+    'POST',
+    'https://psychology.pragmaticdharma.org/api/stem-stats',
+    { scores: {} },
+    [401]
+  );
+
+  // C1 — deep-analysis GET must require auth (use nonexistent user_id to avoid side effects)
+  await requireStatus(
+    'GET /api/deep-analysis?user_id=... (no cookie)',
+    'GET',
+    'https://psychology.pragmaticdharma.org/api/deep-analysis?user_id=auth-test-nonexistent',
+    undefined,
+    [401]
+  );
+
+  // C1 — deep-analysis POST must require auth (nonexistent user_id will fail eligibility anyway,
+  // but fix should reject at auth layer before any DB or Claude call)
+  await requireStatus(
+    'POST /api/deep-analysis start (no cookie)',
+    'POST',
+    'https://psychology.pragmaticdharma.org/api/deep-analysis',
+    { action: 'start', user_id: 'auth-test-nonexistent', analysis_type: 'adaptive' },
+    [401]
+  );
+
+  return { passed, failed };
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -179,7 +244,7 @@ async function main() {
   }
 
   console.log(`${COLORS.bold}Auth Enforcement Tests${COLORS.reset}`);
-  console.log(`${COLORS.dim}Testing 6 sites × 7 scenarios = 42 tests${COLORS.reset}`);
+  console.log(`${COLORS.dim}Testing 6 sites × 7 scenarios + 3 ego critical-endpoint tests = 45 tests${COLORS.reset}`);
 
   const sites = [
     { name: 'Psychic Shield', url: 'https://shield.pragmaticdharma.org/', projectKey: 'shield', authStyle: 'worker-gate' },
@@ -198,6 +263,10 @@ async function main() {
     totalPassed += passed;
     totalFailed += failed;
   }
+
+  const ego = await testEgoCriticals();
+  totalPassed += ego.passed;
+  totalFailed += ego.failed;
 
   // Summary
   console.log(`\n${COLORS.bold}Summary${COLORS.reset}`);

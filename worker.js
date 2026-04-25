@@ -80,11 +80,16 @@ async function injectPlatformNav(html, request, env, projectName) {
   if (jwt) {
     const payload = await verifyJWT(env, jwt);
     if (payload) {
+      // H7: escape `<`, `>`, `&` so a malicious display name can't break out
+      // of the inline <script> via `</script>` or similar.
       const userData = JSON.stringify({
         name: payload.name || '',
         email: payload.email || '',
         role: payload.role || '',
-      });
+      })
+        .replace(/</g, '\\u003c')
+        .replace(/>/g, '\\u003e')
+        .replace(/&/g, '\\u0026');
       userScript = `<script>window.__PD_USER=${userData};</script>`;
     }
   }
@@ -420,6 +425,7 @@ async function handleVerifyCode(request, env) {
     name: user.name,
     role: user.role,
     projects: projects,
+    sessionToken: sessionToken,
   });
 
   return jsonResponse(
@@ -473,9 +479,10 @@ async function handleRefreshSession(request, env) {
     return Response.redirect(loginUrl, 302);
   }
 
-  // Re-read user + projects from DB
-  const user = await env.DB.prepare('SELECT id, email, name, role FROM users WHERE id = ?').bind(payload.sub).first();
-  if (!user) {
+  // Re-read user + projects + status from DB
+  // M6: reject if user has been rejected/suspended since their JWT was issued
+  const user = await env.DB.prepare('SELECT id, email, name, role, status FROM users WHERE id = ?').bind(payload.sub).first();
+  if (!user || user.status !== 'approved') {
     const loginUrl = redirect ? `${loginBase}?redirect=${encodeURIComponent(redirect)}` : loginBase;
     return Response.redirect(loginUrl, 302);
   }
@@ -483,12 +490,14 @@ async function handleRefreshSession(request, env) {
   const projectRows = await env.DB.prepare('SELECT project FROM user_projects WHERE user_id = ?').bind(user.id).all();
   const projects = projectRows.results.map(function(r) { return r.project; });
 
+  // H4: preserve sessionToken across refresh so revocation tracking works
   const newJwt = await signJWT(env, {
     sub: user.id,
     email: user.email,
     name: user.name,
     role: user.role,
     projects: projects,
+    sessionToken: payload.sessionToken,
   });
 
   return new Response(null, {
@@ -528,6 +537,22 @@ async function handleLogout(request, env) {
 // =========================================================================
 
 async function handleAdmin(request, env, path, method) {
+  // H1: CSRF guard on state-changing methods. The admin cookie is
+  // Domain=.pragmaticdharma.org SameSite=Lax, so a compromised sub-project
+  // could otherwise issue same-origin POSTs against /api/admin/* with a
+  // signed-in admin's credentials. Reject anything that didn't originate
+  // from the platform host itself.
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    const origin = request.headers.get('Origin');
+    const referer = request.headers.get('Referer');
+    const fromPlatform =
+      origin === 'https://pragmaticdharma.org' ||
+      (!origin && referer && referer.startsWith('https://pragmaticdharma.org/'));
+    if (!fromPlatform) {
+      return jsonResponse({ error: 'CSRF: Origin mismatch' }, 403);
+    }
+  }
+
   // Require admin JWT
   const jwt = getJWTFromCookie(request);
   if (!jwt) return jsonResponse({ error: 'Unauthorized' }, 401);
@@ -700,6 +725,17 @@ async function verifyJWT(env, token) {
 
     const payload = JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
     if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
+
+    // H2: revocation check. JWTs created post-fix include `sessionToken`;
+    // if present, look it up in the sessions table and reject if revoked.
+    // JWTs without sessionToken are legacy (issued before this change) —
+    // accept them until they expire (max 30 days post-rollout).
+    if (payload.sessionToken && env.DB) {
+      const session = await env.DB.prepare(
+        'SELECT revoked_at FROM sessions WHERE token = ?'
+      ).bind(payload.sessionToken).first();
+      if (!session || session.revoked_at) return null;
+    }
 
     return payload;
   } catch {

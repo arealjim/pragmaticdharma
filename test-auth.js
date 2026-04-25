@@ -133,9 +133,11 @@ async function testSite(name, url, projectKey, secret, authStyle) {
     }
   }
 
-  // Expected statuses depend on auth style
+  // Expected statuses depend on auth style. worker-gate workers redirect
+  // wrong-project to /api/refresh-session (302) — which then 403s if still
+  // denied — so accept either.
   const unauthExpected = authStyle === 'api-gate' ? [401] : [302, 301, 401];
-  const projectDeniedExpected = authStyle === 'api-gate' ? [401, 403] : [403];
+  const projectDeniedExpected = authStyle === 'api-gate' ? [401, 403] : [302, 403];
 
   // 1. No cookie
   await scenario('No cookie', null, unauthExpected);

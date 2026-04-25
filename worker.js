@@ -298,7 +298,7 @@ async function handleSignup(request, env) {
   }
 
   // Check if user already exists
-  const existing = await env.DB.prepare('SELECT id, status FROM users WHERE email = ?').bind(email).first();
+  const existing = await env.DB.prepare('SELECT id, status, updated_at FROM users WHERE email = ?').bind(email).first();
   if (existing) {
     if (existing.status === 'approved') {
       return jsonResponse({ error: 'Account already exists. Try signing in.' }, 409);
@@ -306,7 +306,20 @@ async function handleSignup(request, env) {
     if (existing.status === 'pending') {
       return jsonResponse({ error: 'Request already pending. You\'ll be notified when approved.' }, 409);
     }
-    // Rejected — allow re-signup
+    // M10: rejected user re-signup. Previously every re-signup attempt
+    // re-fired the Discord notification, so a determined attacker (or a
+    // confused rejected user) could spam the admin channel indefinitely.
+    // Now: return a generic message and silently NO-OP until 30 days
+    // since rejection. Genuine cases have to email admin out-of-band.
+    const REJECT_COOLDOWN_DAYS = 30;
+    const rejectedAt = new Date(existing.updated_at + 'Z');
+    const cooldownEnd = new Date(rejectedAt.getTime() + REJECT_COOLDOWN_DAYS * 24 * 3600 * 1000);
+    if (Date.now() < cooldownEnd.getTime()) {
+      // Don't reveal status — return the same generic message a fresh
+      // signup would have gotten so attackers can't enumerate rejection.
+      return jsonResponse({ ok: true, autoApproved: false });
+    }
+    // Cooldown expired — accept re-signup, fire notification.
     await env.DB.prepare('UPDATE users SET name = ?, note = ?, status = \'pending\', updated_at = datetime(\'now\') WHERE id = ?')
       .bind(name, note || null, existing.id).run();
     await notifyDiscord(env, signupEmbed(name, email, note, 're-signup'));

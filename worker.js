@@ -32,12 +32,31 @@ import NAV_BAR_HTML from './shared/nav-bar.html';
 
 const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice'];
 
+// H6: explicit allowlist of redirect destinations. Previously the regex
+// allowed any *.pragmaticdharma.org subdomain — a dangling DNS / takeover
+// of an unused subdomain would have been a cheap pivot to phish auth
+// tokens via the post-login redirect. Anchor on the actual platform
+// subdomains we use.
+const REDIRECT_ALLOWLIST = new Set([
+  'pragmaticdharma.org',
+  'retreats.pragmaticdharma.org',
+  'health.pragmaticdharma.org',
+  'shield.pragmaticdharma.org',
+  'psychology.pragmaticdharma.org',
+  'mindreader.pragmaticdharma.org',
+  'psychtools.pragmaticdharma.org',
+  'astrology.pragmaticdharma.org',
+  'practice.pragmaticdharma.org',
+]);
+
 function validateRedirectUrl(url) {
   if (!url || typeof url !== 'string') return '';
   url = url.trim();
-  // Allow only https://*.pragmaticdharma.org paths
-  if (/^https:\/\/[a-z0-9-]+\.pragmaticdharma\.org(\/.*)?$/.test(url)) return url;
-  return '';
+  let parsed;
+  try { parsed = new URL(url); } catch { return ''; }
+  if (parsed.protocol !== 'https:') return '';
+  if (!REDIRECT_ALLOWLIST.has(parsed.hostname)) return '';
+  return url;
 }
 
 function redirectUrlToProject(url) {

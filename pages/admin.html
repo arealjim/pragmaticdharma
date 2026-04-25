@@ -237,6 +237,11 @@
           section.innerHTML = '<p class="empty">No pending requests.</p>';
           return;
         }
+        // M3: switch from inline onclick="doAction('approve','" + esc(email) + "'..." to
+        // event delegation on data-action + data-email. esc() returns
+        // textContent-safe HTML (good for innerHTML interpolation) but the
+        // email was being concatenated INTO a JS string inside an HTML
+        // attribute — three nested contexts, two escaping rules. Brittle.
         var html = '<table><thead><tr><th>Name</th><th>Email</th><th>Note</th><th>Date</th><th>Actions</th></tr></thead><tbody>';
         data.users.forEach(function(u) {
           html += '<tr>'
@@ -245,12 +250,18 @@
             + '<td class="note-cell" title="' + esc(u.note || '') + '">' + esc(u.note || '-') + '</td>'
             + '<td>' + formatDate(u.created_at) + '</td>'
             + '<td><div class="btn-group">'
-            + '<button class="btn btn-approve" onclick="doAction(\'approve\',\'' + esc(u.email) + '\',this)">Approve</button>'
-            + '<button class="btn btn-reject" onclick="doAction(\'reject\',\'' + esc(u.email) + '\',this)">Reject</button>'
+            + '<button class="btn btn-approve" data-action="approve" data-email="' + esc(u.email) + '">Approve</button>'
+            + '<button class="btn btn-reject" data-action="reject" data-email="' + esc(u.email) + '">Reject</button>'
             + '</div></td></tr>';
         });
         html += '</tbody></table>';
         section.innerHTML = html;
+        // Wire up the buttons via delegation
+        section.querySelectorAll('button[data-action]').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            doAction(btn.dataset.action, btn.dataset.email, btn);
+          });
+        });
       })
       .catch(function() {
         document.getElementById('pending-section').innerHTML = '<p class="msg err">Failed to load pending requests.</p>';

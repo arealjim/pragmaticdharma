@@ -63,7 +63,7 @@ All platform secrets live in **Cloudflare Secrets Store** under store name `prag
 
 **Other shared secrets:** `OWNER_EMAIL`.
 
-**Per-service plain Worker secrets** (still on `wrangler secret put` until next rotation): `RESEND_API_KEY` and `DISCORD_WEBHOOK_URL` on `pragmaticdharma`. Code reads via `getSecret(env, name)` which handles both binding types transparently.
+**Per-service plain Worker secrets** (still on `wrangler secret put` until next rotation): `DISCORD_WEBHOOK_URL` on `pragmaticdharma` (signup notifications + retention-sweep alerts). `RESEND_API_KEY` was migrated to Secrets Store on 2026-04-25 as `PRAGMATICDHARMA_RESEND_API_KEY`. Code reads via `getSecret(env, name)` which handles both binding types transparently.
 
 ⚠️ Platform Worker `compatibility_date` must be `2026-04-01` or later for Secrets Store bindings to work — older dates break `.get()`.
 
@@ -75,7 +75,7 @@ schema.sql          # D1 schema (users, magic_links, sessions, access_logs, conf
 wrangler.toml       # Worker config + D1 binding
 package.json        # Wrangler dev dependency
 pd                  # Admin CLI (bash, wraps wrangler d1 execute)
-test-auth.js        # Auth enforcement integration tests (42 tests across all subdomains)
+test-auth.js        # Auth enforcement integration tests (45 tests across 6 subdomains + ego criticals)
 pages/
   index.html        # Landing page (project cards)
   login.html        # Login form (email + 6-digit code)
@@ -86,7 +86,14 @@ shared/
   auth-flask.py       # Canonical JWT auth for Python/Flask
   nav-bar.html        # Platform navigation bar template
   README.md           # Auth & nav integration guide
+docs/
+  ai-development-guide.md          # Phase 3: patterns, gotchas, security checklist
+reviews/
+  2026-04-23-<service>.md          # Phase 1 audit reports
+  remediation-status-2026-04-25.md # Master remediation tracker (closed + deferred)
 ```
+
+For deferred items: prompt files live at `~/prompts/`. See the remediation tracker for which prompts cover which findings.
 
 ## Testing
 

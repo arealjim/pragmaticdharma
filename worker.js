@@ -226,7 +226,27 @@ export default {
 // =========================================================================
 
 async function handleSignup(request, env) {
-  // Global signup rate limit: max 20 per hour
+  // M1: per-IP signup rate limit. Without it, the global 20/hour cap was
+  // a denial-of-service knob (one attacker hits the cap → real users can't
+  // sign up) AND every signup fires Discord webhooks, so a single bad
+  // actor could flood the admin channel. Per-IP 5/hour stops both.
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const ipCount = await env.DB.prepare(
+    "SELECT COUNT(*) as cnt FROM access_logs " +
+    "WHERE ip_address = ? AND project = 'platform-signup' " +
+    "AND created_at > datetime('now', '-1 hour')"
+  ).bind(ip).first();
+  if (ipCount && ipCount.cnt >= 5) {
+    return jsonResponse({ error: 'Too many signups from your IP. Try again in an hour.' }, 429);
+  }
+  // Record the attempt regardless of success — counter is signup attempts
+  // per IP, not successful signups (an attacker can't bypass by erroring
+  // their JSON or hitting the dedupe path).
+  await env.DB.prepare(
+    "INSERT INTO access_logs (project, ip_address, path, user_agent) VALUES ('platform-signup', ?, '/api/signup', ?)"
+  ).bind(ip, request.headers.get('User-Agent') || null).run().catch(() => {});
+
+  // Global signup rate limit: max 20 per hour (kept as a backstop)
   const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
   const signupCount = await env.DB.prepare(
     'SELECT COUNT(*) as cnt FROM users WHERE created_at > ?'

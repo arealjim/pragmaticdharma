@@ -24,9 +24,14 @@ crons = ["0 4 * * *"]
 # picks the right one to sign each JWT based on the destination subdomain
 # (kid header). Sub-services hold ONLY their own key.
 #
-# RESEND_API_KEY and DISCORD_WEBHOOK_URL remain plain Worker secrets
-# (set via `wrangler secret put <NAME>`) until rotation; they'll move to
-# Secrets Store when next rotated. The getSecret helper handles both.
+# DISCORD_WEBHOOK_URL remains a plain Worker secret (set via
+# `wrangler secret put`) until rotation; it'll move to Secrets Store when
+# next rotated. The getSecret helper handles both.
+[[secrets_store_secrets]]
+binding     = "RESEND_API_KEY"
+store_id    = "626a023faf5e4be98729d2f4b9849f09"
+secret_name = "PRAGMATICDHARMA_RESEND_API_KEY"
+
 [[secrets_store_secrets]]
 binding     = "JWT_SECRET_PRAGMATICDHARMA"
 store_id    = "626a023faf5e4be98729d2f4b9849f09"

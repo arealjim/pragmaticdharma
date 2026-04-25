@@ -31,6 +31,15 @@ CREATE TABLE IF NOT EXISTS magic_links (
 CREATE INDEX IF NOT EXISTS idx_magic_links_email ON magic_links(email);
 CREATE INDEX IF NOT EXISTS idx_magic_links_code ON magic_links(code);
 
+-- H5: Per-email failure counter for /api/verify code path. Hard-caps brute
+-- force at 5 attempts per 15-minute window before all active links for the
+-- email are invalidated (forcing the user to request a fresh login email).
+CREATE TABLE IF NOT EXISTS verify_failures (
+    email TEXT PRIMARY KEY,
+    count INTEGER NOT NULL DEFAULT 0,
+    first_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+);
+
 -- Sessions (30-day expiry, revocable)
 CREATE TABLE IF NOT EXISTS sessions (
     token TEXT PRIMARY KEY,

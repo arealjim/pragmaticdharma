@@ -59,6 +59,22 @@ function redirectUrlToProject(url) {
   }
 }
 
+// M2: baseline CSP for the platform Worker. script-src/style-src allow
+// 'unsafe-inline' because admin.html and login.html have inline scripts;
+// migrate those to nonces in a follow-up. connect-src allowlists the
+// sub-projects whose APIs admin.html cross-fetches.
+const CSP_HEADER = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self'",
+  "connect-src 'self' https://health.pragmaticdharma.org https://psychology.pragmaticdharma.org",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ');
+
 const HTML_HEADERS = {
   'content-type': 'text/html; charset=utf-8',
   'cache-control': 'no-store',
@@ -66,6 +82,7 @@ const HTML_HEADERS = {
   'x-content-type-options': 'nosniff',
   'x-frame-options': 'DENY',
   'strict-transport-security': 'max-age=63072000; includeSubDomains',
+  'content-security-policy': CSP_HEADER,
 };
 
 // =========================================================================
@@ -368,6 +385,47 @@ async function handleVerifyLink(token, request, env) {
 // VERIFY (6-digit code)
 // =========================================================================
 
+// H5: brute-force guard. setTimeout(1000) on the verify path doesn't
+// stop a parallel-connections attacker from chewing through the 6-digit
+// code space. Per-email counter does — after 5 misses in 15 minutes,
+// every active magic_link for the email is invalidated.
+const VERIFY_FAILURE_WINDOW_S = 15 * 60;
+const VERIFY_FAILURE_MAX = 5;
+
+async function recordVerifyFailureAndCheck(env, email) {
+  const now = Math.floor(Date.now() / 1000);
+  const row = await env.DB.prepare(
+    'SELECT count, first_at FROM verify_failures WHERE email = ?'
+  ).bind(email).first();
+
+  if (!row || (now - row.first_at) > VERIFY_FAILURE_WINDOW_S) {
+    // Fresh window
+    await env.DB.prepare(
+      'INSERT INTO verify_failures (email, count, first_at) VALUES (?, 1, ?) ' +
+      'ON CONFLICT(email) DO UPDATE SET count = 1, first_at = excluded.first_at'
+    ).bind(email, now).run();
+    return { tooMany: false };
+  }
+
+  const newCount = row.count + 1;
+  await env.DB.prepare(
+    'UPDATE verify_failures SET count = ? WHERE email = ?'
+  ).bind(newCount, email).run();
+
+  if (newCount >= VERIFY_FAILURE_MAX) {
+    // Burn all active magic_links for this email.
+    await env.DB.prepare(
+      "UPDATE magic_links SET used_at = datetime('now') WHERE email = ? AND used_at IS NULL"
+    ).bind(email).run();
+    return { tooMany: true };
+  }
+  return { tooMany: false };
+}
+
+async function clearVerifyFailures(env, email) {
+  await env.DB.prepare('DELETE FROM verify_failures WHERE email = ?').bind(email).run();
+}
+
 async function handleVerifyCode(request, env) {
   let body;
   try {
@@ -384,19 +442,35 @@ async function handleVerifyCode(request, env) {
     return jsonResponse({ error: 'Email and 6-digit code required' }, 400);
   }
 
+  // Pre-check: if already over the limit in this window, reject without
+  // even doing the DB lookup (also reduces work an attacker can force us to do).
+  const preRow = await env.DB.prepare(
+    'SELECT count, first_at FROM verify_failures WHERE email = ?'
+  ).bind(email).first();
+  const nowEpoch = Math.floor(Date.now() / 1000);
+  if (preRow && preRow.count >= VERIFY_FAILURE_MAX && (nowEpoch - preRow.first_at) <= VERIFY_FAILURE_WINDOW_S) {
+    return jsonResponse({ error: 'Too many attempts. Request a new login email.' }, 429);
+  }
+
   // Find matching unused, unexpired magic link by code + email
   const link = await env.DB.prepare(
     'SELECT token, email, user_id, expires_at, used_at FROM magic_links WHERE code = ? AND email = ? AND used_at IS NULL ORDER BY created_at DESC LIMIT 1'
   ).bind(code, email).first();
 
   if (!link) {
-    await new Promise(r => setTimeout(r, 1000)); // Throttle brute force
+    const guard = await recordVerifyFailureAndCheck(env, email);
+    if (guard.tooMany) {
+      return jsonResponse({ error: 'Too many attempts. Request a new login email.' }, 429);
+    }
     return jsonResponse({ error: 'Invalid or expired code' }, 401);
   }
   if (new Date(link.expires_at) < new Date()) {
-    await new Promise(r => setTimeout(r, 1000));
+    await recordVerifyFailureAndCheck(env, email);
     return jsonResponse({ error: 'Code expired. Request a new one.' }, 401);
   }
+
+  // Success: clear any failure record for this email
+  await clearVerifyFailures(env, email);
 
   // Mark used
   await env.DB.prepare('UPDATE magic_links SET used_at = datetime(\'now\') WHERE token = ?').bind(link.token).run();

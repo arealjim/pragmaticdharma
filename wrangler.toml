@@ -14,15 +14,57 @@ routes = [
   { pattern = "retreats.pragmaticdharma.org/*", zone_name = "pragmaticdharma.org" }
 ]
 
-# JWT_SECRET is bound from the shared "pragmaticdharma" Secrets Store.
+# Per-service JWT keys (Task #2). The platform Worker holds ALL signing
+# keys: each sub-service has its own key in the Secrets Store, the platform
+# picks the right one to sign each JWT based on the destination subdomain
+# (kid header). Sub-services hold ONLY their own key.
+#
 # RESEND_API_KEY and DISCORD_WEBHOOK_URL remain plain Worker secrets
 # (set via `wrangler secret put <NAME>`) until rotation; they'll move to
-# Secrets Store when next rotated. The getSecret helper in worker.js
-# transparently handles both binding types.
+# Secrets Store when next rotated. The getSecret helper handles both.
+# Original shared JWT_SECRET — kept bound on the platform Worker because
+# tcm-tracker (health.pragmaticdharma.org) still verifies with this value.
+# Until that Flask service rotates to its own key, the platform signs
+# kid='health' JWTs with this shared value.
 [[secrets_store_secrets]]
 binding     = "JWT_SECRET"
 store_id    = "626a023faf5e4be98729d2f4b9849f09"
 secret_name = "JWT_SECRET"
+
+[[secrets_store_secrets]]
+binding     = "JWT_SECRET_PRAGMATICDHARMA"
+store_id    = "626a023faf5e4be98729d2f4b9849f09"
+secret_name = "JWT_SECRET_PRAGMATICDHARMA"
+
+[[secrets_store_secrets]]
+binding     = "JWT_SECRET_EGO_ASSESSMENT"
+store_id    = "626a023faf5e4be98729d2f4b9849f09"
+secret_name = "JWT_SECRET_EGO_ASSESSMENT"
+
+[[secrets_store_secrets]]
+binding     = "JWT_SECRET_SHIELD"
+store_id    = "626a023faf5e4be98729d2f4b9849f09"
+secret_name = "JWT_SECRET_SHIELD"
+
+[[secrets_store_secrets]]
+binding     = "JWT_SECRET_MINDREADER"
+store_id    = "626a023faf5e4be98729d2f4b9849f09"
+secret_name = "JWT_SECRET_MINDREADER"
+
+[[secrets_store_secrets]]
+binding     = "JWT_SECRET_PSYCHTOOLS"
+store_id    = "626a023faf5e4be98729d2f4b9849f09"
+secret_name = "JWT_SECRET_PSYCHTOOLS"
+
+[[secrets_store_secrets]]
+binding     = "JWT_SECRET_ASTROLOGY"
+store_id    = "626a023faf5e4be98729d2f4b9849f09"
+secret_name = "JWT_SECRET_ASTROLOGY"
+
+[[secrets_store_secrets]]
+binding     = "JWT_SECRET_PRACTICE"
+store_id    = "626a023faf5e4be98729d2f4b9849f09"
+secret_name = "JWT_SECRET_PRACTICE"
 
 # D1 database — fill ID after running: wrangler d1 create pragmaticdharma
 [[d1_databases]]

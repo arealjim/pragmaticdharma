@@ -21,8 +21,8 @@ function base64urlEncode(data) {
   return str.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-async function signJWT(payload, secret) {
-  const header = { alg: 'HS256', typ: 'JWT' };
+async function signJWT(payload, secret, kid) {
+  const header = kid ? { alg: 'HS256', typ: 'JWT', kid } : { alg: 'HS256', typ: 'JWT' };
   const encodedHeader = base64urlEncode(Buffer.from(JSON.stringify(header)).toString('base64'));
   const encodedPayload = base64urlEncode(Buffer.from(JSON.stringify(payload)).toString('base64'));
   const signingInput = `${encodedHeader}.${encodedPayload}`;
@@ -91,13 +91,19 @@ function statusMatches(actual, expected) {
  *     (shield, mindreader)
  * - 'api-gate': Auth checked at API level. All failures → 401, project-denied = unauth.
  *     (ego-assessment via validateSession, health via Flask @require_auth on API routes)
+ *
+ * Per-service JWT keys (Task #2): each site verifies with its own per-service
+ * key, so the test JWT must be signed with that key + kid header. The kid
+ * matches the project key in most cases (kid='shield' for psychic-shield,
+ * kid='mindreader' for mind-reader, etc.) — except ego-assessment which uses
+ * kid='ego-assessment' to match the platform's KID_TO_BINDING map.
  */
 
 /**
  * Run all 7 test scenarios against a single site.
  * Returns { passed, failed, results[] }.
  */
-async function testSite(name, url, projectKey, secret, authStyle) {
+async function testSite(name, url, projectKey, secret, authStyle, kid) {
   const results = [];
   let passed = 0;
   let failed = 0;
@@ -143,26 +149,26 @@ async function testSite(name, url, projectKey, secret, authStyle) {
   await scenario('No cookie', null, unauthExpected);
 
   // 2. Expired JWT
-  const expiredToken = await signJWT(makePayload([projectKey], { expired: true }), secret);
+  const expiredToken = await signJWT(makePayload([projectKey], { expired: true }), secret, kid);
   await scenario('Expired JWT', expiredToken, unauthExpected);
 
   // 3. Valid JWT, missing project
-  const wrongProjectToken = await signJWT(makePayload(['other-project']), secret);
+  const wrongProjectToken = await signJWT(makePayload(['other-project']), secret, kid);
   await scenario('Valid JWT, missing project', wrongProjectToken, projectDeniedExpected);
 
   // 4. Valid JWT, has project → 200
-  const validToken = await signJWT(makePayload([projectKey]), secret);
+  const validToken = await signJWT(makePayload([projectKey]), secret, kid);
   await scenario('Valid JWT, has project', validToken, [200]);
 
   // 5. Malformed JWT
   await scenario('Malformed JWT', 'this.is.not-a-valid-jwt', unauthExpected);
 
   // 6. No projects claim (backward compat) → 200
-  const noProjectsToken = await signJWT(makePayload(undefined), secret);
+  const noProjectsToken = await signJWT(makePayload(undefined), secret, kid);
   await scenario('No projects claim (compat)', noProjectsToken, [200]);
 
   // 7. Empty projects array
-  const emptyProjectsToken = await signJWT(makePayload([]), secret);
+  const emptyProjectsToken = await signJWT(makePayload([]), secret, kid);
   await scenario('Empty projects array', emptyProjectsToken, projectDeniedExpected);
 
   return { passed, failed, results };
@@ -237,11 +243,30 @@ async function testEgoCriticals() {
 // Main
 // ---------------------------------------------------------------------------
 
+// Read each per-service JWT key from env, falling back to JWT_SECRET for any
+// site whose key isn't explicitly set. Test JWTs need the same key the site
+// itself verifies with (per-service post-Task #2).
+function readKeys() {
+  const fallback = process.env.JWT_SECRET;
+  return {
+    shield:           process.env.JWT_SECRET_SHIELD          || fallback,
+    mindreader:       process.env.JWT_SECRET_MINDREADER      || fallback,
+    psychtools:       process.env.JWT_SECRET_PSYCHTOOLS      || fallback,
+    astrology:        process.env.JWT_SECRET_ASTROLOGY       || fallback,
+    'ego-assessment': process.env.JWT_SECRET_EGO_ASSESSMENT  || fallback,
+    practice:         process.env.JWT_SECRET_PRACTICE        || fallback,
+    health:           process.env.JWT_SECRET_HEALTH          || fallback,
+  };
+}
+
 async function main() {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    console.error(`${COLORS.red}Error: JWT_SECRET environment variable is required.${COLORS.reset}`);
-    console.error('Usage: JWT_SECRET=<value> node test-auth.js');
+  const keys = readKeys();
+  const allKeysPresent = Object.values(keys).every(k => !!k);
+  if (!allKeysPresent) {
+    console.error(`${COLORS.red}Error: per-service JWT keys required. Set:${COLORS.reset}`);
+    console.error('  JWT_SECRET_SHIELD, JWT_SECRET_MINDREADER, JWT_SECRET_PSYCHTOOLS,');
+    console.error('  JWT_SECRET_ASTROLOGY, JWT_SECRET_EGO_ASSESSMENT, JWT_SECRET_PRACTICE,');
+    console.error('  JWT_SECRET_HEALTH (or JWT_SECRET as a single fallback for all).');
     process.exit(2);
   }
 
@@ -249,19 +274,20 @@ async function main() {
   console.log(`${COLORS.dim}Testing 6 sites × 7 scenarios + 3 ego critical-endpoint tests = 45 tests${COLORS.reset}`);
 
   const sites = [
-    { name: 'Psychic Shield', url: 'https://shield.pragmaticdharma.org/', projectKey: 'shield', authStyle: 'worker-gate' },
-    { name: 'Mind Reader', url: 'https://mindreader.pragmaticdharma.org/', projectKey: 'mindreader', authStyle: 'worker-gate' },
-    { name: 'PsychTools', url: 'https://psychtools.pragmaticdharma.org/', projectKey: 'psychtools', authStyle: 'worker-gate' },
-    { name: 'Transit Viewer', url: 'https://astrology.pragmaticdharma.org/', projectKey: 'astrology', authStyle: 'worker-gate' },
-    { name: 'Ego Assessment', url: 'https://psychology.pragmaticdharma.org/api/profile', projectKey: 'ego-assessment', authStyle: 'api-gate' },
-    { name: 'Health Tracker', url: 'https://health.pragmaticdharma.org/api/mood/trends', projectKey: 'health', authStyle: 'api-gate' },
+    { name: 'Psychic Shield', url: 'https://shield.pragmaticdharma.org/',                   projectKey: 'shield',          authStyle: 'worker-gate', kid: 'shield' },
+    { name: 'Mind Reader',    url: 'https://mindreader.pragmaticdharma.org/',               projectKey: 'mindreader',      authStyle: 'worker-gate', kid: 'mindreader' },
+    { name: 'PsychTools',     url: 'https://psychtools.pragmaticdharma.org/',               projectKey: 'psychtools',      authStyle: 'worker-gate', kid: 'psychtools' },
+    { name: 'Transit Viewer', url: 'https://astrology.pragmaticdharma.org/',                projectKey: 'astrology',       authStyle: 'worker-gate', kid: 'astrology' },
+    { name: 'Ego Assessment', url: 'https://psychology.pragmaticdharma.org/api/profile',    projectKey: 'ego-assessment',  authStyle: 'api-gate',    kid: 'ego-assessment' },
+    { name: 'Health Tracker', url: 'https://health.pragmaticdharma.org/api/mood/trends',    projectKey: 'health',          authStyle: 'api-gate',    kid: 'health' },
   ];
 
   let totalPassed = 0;
   let totalFailed = 0;
 
   for (const site of sites) {
-    const { passed, failed } = await testSite(site.name, site.url, site.projectKey, secret, site.authStyle);
+    const secret = keys[site.kid];
+    const { passed, failed } = await testSite(site.name, site.url, site.projectKey, secret, site.authStyle, site.kid);
     totalPassed += passed;
     totalFailed += failed;
   }

@@ -519,7 +519,7 @@ async function handleVerifyCode(request, env) {
     role: user.role,
     projects: projects,
     sessionToken: sessionToken,
-  });
+  }, kidForRedirect(redirect));
 
   return jsonResponse(
     { ok: true, redirect: redirect || '/' },
@@ -583,7 +583,9 @@ async function handleRefreshSession(request, env) {
   const projectRows = await env.DB.prepare('SELECT project FROM user_projects WHERE user_id = ?').bind(user.id).all();
   const projects = projectRows.results.map(function(r) { return r.project; });
 
-  // H4: preserve sessionToken across refresh so revocation tracking works
+  // H4: preserve sessionToken across refresh so revocation tracking works.
+  // Task #2: re-sign with the destination project's key so the redirected
+  // sub-service can verify with its own key.
   const newJwt = await signJWT(env, {
     sub: user.id,
     email: user.email,
@@ -591,7 +593,7 @@ async function handleRefreshSession(request, env) {
     role: user.role,
     projects: projects,
     sessionToken: payload.sessionToken,
-  });
+  }, kidForRedirect(redirect));
 
   return new Response(null, {
     status: 302,
@@ -780,10 +782,47 @@ async function handleAdmin(request, env, path, method) {
 
 // =========================================================================
 // JWT (HMAC-SHA256 via Web Crypto)
+//
+// Per-service signing keys: each sub-project has its own JWT_SECRET_<name>
+// in the Secrets Store. The platform Worker holds all keys; sub-services
+// hold only their own. JWTs include a `kid` header naming the issuing
+// project so each verifier can pick the right key. Compromise of any one
+// service's binding only enables forgery of that service's JWTs — not
+// platform-wide takeover (the goal of Task #2).
 // =========================================================================
 
-async function signJWT(env, payload) {
-  const header = { alg: 'HS256', typ: 'JWT' };
+const KID_TO_BINDING = {
+  'pragmaticdharma':  'JWT_SECRET_PRAGMATICDHARMA',
+  'ego-assessment':   'JWT_SECRET_EGO_ASSESSMENT',
+  'shield':           'JWT_SECRET_SHIELD',
+  'mindreader':       'JWT_SECRET_MINDREADER',
+  'psychtools':       'JWT_SECRET_PSYCHTOOLS',
+  'astrology':        'JWT_SECRET_ASTROLOGY',
+  'practice':         'JWT_SECRET_PRACTICE',
+  // tcm-tracker (health) is a Flask service on devbox using /etc/tcm-tracker/env
+  // for its JWT_SECRET. Until that file is rotated to a per-service key, the
+  // platform signs health JWTs with the original shared JWT_SECRET, which is
+  // the same value tcm-tracker has on disk. Once tcm-tracker rotates, swap
+  // this to JWT_SECRET_HEALTH and add a Secrets Store entry by that name.
+  'health':           'JWT_SECRET',
+};
+
+async function getSigningKeyForKid(env, kid) {
+  const bindingName = KID_TO_BINDING[kid];
+  if (!bindingName) return null;
+  const secret = await getSecret(env, bindingName);
+  if (!secret) return null;
+  return crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify']
+  );
+}
+
+async function signJWT(env, payload, kid = 'pragmaticdharma') {
+  const header = { alg: 'HS256', typ: 'JWT', kid };
   const now = Math.floor(Date.now() / 1000);
   const claims = { ...payload, iat: now, exp: now + 30 * 24 * 60 * 60 };
 
@@ -791,7 +830,8 @@ async function signJWT(env, payload) {
   const encodedPayload = base64url(JSON.stringify(claims));
   const signingInput = `${encodedHeader}.${encodedPayload}`;
 
-  const key = await getSigningKey(env);
+  const key = await getSigningKeyForKid(env, kid);
+  if (!key) throw new Error(`No signing key for kid: ${kid}`);
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signingInput));
   const encodedSig = base64url(sig);
 
@@ -805,13 +845,18 @@ async function verifyJWT(env, token) {
 
     const [encodedHeader, encodedPayload, encodedSig] = parts;
 
-    // Validate header algorithm
     const header = JSON.parse(atob(encodedHeader.replace(/-/g, '+').replace(/_/g, '/')));
     if (header.alg !== 'HS256') return null;
 
-    const signingInput = `${encodedHeader}.${encodedPayload}`;
+    // kid header tells us which service's key to use. Reject JWTs without
+    // a kid (legacy format pre-Task-#2) — users must re-login. Pre-public-
+    // launch, this is a one-time disruption for the small user set.
+    const kid = header.kid;
+    if (!kid || !KID_TO_BINDING[kid]) return null;
 
-    const key = await getSigningKey(env);
+    const signingInput = `${encodedHeader}.${encodedPayload}`;
+    const key = await getSigningKeyForKid(env, kid);
+    if (!key) return null;
     const sig = base64urlDecode(encodedSig);
     const valid = await crypto.subtle.verify('HMAC', key, sig, new TextEncoder().encode(signingInput));
     if (!valid) return null;
@@ -819,10 +864,7 @@ async function verifyJWT(env, token) {
     const payload = JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
     if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
 
-    // H2: revocation check. JWTs created post-fix include `sessionToken`;
-    // if present, look it up in the sessions table and reject if revoked.
-    // JWTs without sessionToken are legacy (issued before this change) —
-    // accept them until they expire (max 30 days post-rollout).
+    // H2: revocation check via sessions table.
     if (payload.sessionToken && env.DB) {
       const session = await env.DB.prepare(
         'SELECT revoked_at FROM sessions WHERE token = ?'
@@ -836,8 +878,17 @@ async function verifyJWT(env, token) {
   }
 }
 
+// Map a redirect URL to the kid that should sign the JWT for that destination.
+// Falls back to 'pragmaticdharma' (the platform's own key) if there's no
+// redirect or the host isn't recognized — those JWTs are platform-internal.
+function kidForRedirect(redirect) {
+  return redirectUrlToProject(redirect) || 'pragmaticdharma';
+}
+
 async function getSigningKey(env) {
-  const secret = await getSecret(env, 'JWT_SECRET');
+  // Legacy helper retained only for callers that still expect a single key.
+  // Prefer getSigningKeyForKid + signJWT(env, payload, kid).
+  const secret = await getSecret(env, 'JWT_SECRET_PRAGMATICDHARMA');
   return crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
@@ -887,7 +938,7 @@ async function createSessionAndRedirect(userId, email, request, env, redirect) {
     role: user.role,
     projects: projects,
     sessionToken: sessionToken,
-  });
+  }, kidForRedirect(redirect));
 
   return new Response(null, {
     status: 302,

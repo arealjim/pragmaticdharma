@@ -22,15 +22,6 @@ routes = [
 # RESEND_API_KEY and DISCORD_WEBHOOK_URL remain plain Worker secrets
 # (set via `wrangler secret put <NAME>`) until rotation; they'll move to
 # Secrets Store when next rotated. The getSecret helper handles both.
-# Original shared JWT_SECRET — kept bound on the platform Worker because
-# tcm-tracker (health.pragmaticdharma.org) still verifies with this value.
-# Until that Flask service rotates to its own key, the platform signs
-# kid='health' JWTs with this shared value.
-[[secrets_store_secrets]]
-binding     = "JWT_SECRET"
-store_id    = "626a023faf5e4be98729d2f4b9849f09"
-secret_name = "JWT_SECRET"
-
 [[secrets_store_secrets]]
 binding     = "JWT_SECRET_PRAGMATICDHARMA"
 store_id    = "626a023faf5e4be98729d2f4b9849f09"
@@ -65,6 +56,11 @@ secret_name = "JWT_SECRET_ASTROLOGY"
 binding     = "JWT_SECRET_PRACTICE"
 store_id    = "626a023faf5e4be98729d2f4b9849f09"
 secret_name = "JWT_SECRET_PRACTICE"
+
+[[secrets_store_secrets]]
+binding     = "JWT_SECRET_HEALTH"
+store_id    = "626a023faf5e4be98729d2f4b9849f09"
+secret_name = "JWT_SECRET_HEALTH"
 
 # D1 database — fill ID after running: wrangler d1 create pragmaticdharma
 [[d1_databases]]

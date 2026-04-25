@@ -799,12 +799,9 @@ const KID_TO_BINDING = {
   'psychtools':       'JWT_SECRET_PSYCHTOOLS',
   'astrology':        'JWT_SECRET_ASTROLOGY',
   'practice':         'JWT_SECRET_PRACTICE',
-  // tcm-tracker (health) is a Flask service on devbox using /etc/tcm-tracker/env
-  // for its JWT_SECRET. Until that file is rotated to a per-service key, the
-  // platform signs health JWTs with the original shared JWT_SECRET, which is
-  // the same value tcm-tracker has on disk. Once tcm-tracker rotates, swap
-  // this to JWT_SECRET_HEALTH and add a Secrets Store entry by that name.
-  'health':           'JWT_SECRET',
+  // tcm-tracker (health) — has its own per-service key in the Store and on
+  // /etc/tcm-tracker/env. Rotated 2026-04-25 (Task #20).
+  'health':           'JWT_SECRET_HEALTH',
 };
 
 async function getSigningKeyForKid(env, kid) {

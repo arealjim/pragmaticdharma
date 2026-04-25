@@ -12,6 +12,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import time
 from typing import Optional
 from urllib.parse import quote
@@ -64,7 +65,10 @@ def verify_jwt(token: str, secret: str) -> Optional[dict]:
             return None
 
         return payload
-    except (json.JSONDecodeError, KeyError, UnicodeDecodeError, Exception):
+    except Exception as e:
+        # L6: swallow all decode/HMAC errors (auth verification should never
+        # leak why a token was rejected) but log at DEBUG for observability.
+        logging.debug("verify_pd_jwt rejected token: %s", e)
         return None
 
 

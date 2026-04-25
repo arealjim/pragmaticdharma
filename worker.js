@@ -383,6 +383,24 @@ async function handleLogin(request, env) {
     return jsonResponse({ error: 'Valid email is required' }, 400);
   }
 
+  // L2: rate-limit by IP BEFORE looking up the user, so the 429 vs. 403
+  // status doesn't reveal whether the email exists.
+  const ip = request.headers.get('CF-Connecting-IP') || '';
+  const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+  if (ip) {
+    const ipAttempts = await env.DB.prepare(
+      "SELECT COUNT(*) as cnt FROM access_logs WHERE project = 'platform-login' AND ip_address = ? AND created_at > ?"
+    ).bind(ip, oneHourAgo).first();
+    if (ipAttempts && ipAttempts.cnt >= 20) {
+      return jsonResponse({ error: 'Too many login attempts. Try again in an hour.' }, 429);
+    }
+  }
+  // Always log the attempt (whether the user exists or not), so the IP
+  // counter sees both successful and failed probes.
+  await env.DB.prepare(
+    "INSERT INTO access_logs (project, ip_address, path, user_agent) VALUES ('platform-login', ?, '/api/login', ?)"
+  ).bind(ip || null, request.headers.get('User-Agent') || null).run().catch(() => {});
+
   // Check user exists and is approved
   const user = await env.DB.prepare('SELECT id, status, role FROM users WHERE email = ?').bind(email).first();
   if (!user || user.status !== 'approved') {
@@ -390,8 +408,9 @@ async function handleLogin(request, env) {
     return jsonResponse({ error: 'Unable to sign in. Check your email or request access first.' }, 403);
   }
 
-  // Rate limit: 3 magic links per email per hour
-  const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+  // Per-email rate limit: 3 magic links per email per hour (kept as a
+  // second layer; the per-IP check above prevents enumeration from hitting
+  // this 429 selectively).
   const recentCount = await env.DB.prepare(
     'SELECT COUNT(*) as cnt FROM magic_links WHERE email = ? AND created_at > ?'
   ).bind(email, oneHourAgo).first();
@@ -431,7 +450,8 @@ async function handleVerifyLink(token, request, env) {
   const qIdx = token.indexOf('?');
   if (qIdx !== -1) token = token.slice(0, qIdx);
 
-  if (!token || token.length !== 64) {
+  // L3: validate length AND charset (32 random bytes hex-encoded → 64 hex chars).
+  if (!token || !/^[0-9a-f]{64}$/.test(token)) {
     return redirectWithError('Invalid link');
   }
 
@@ -811,8 +831,7 @@ async function handleAdmin(request, env, path, method) {
     query += ' ORDER BY created_at DESC LIMIT ?';
     params.push(limit);
 
-    const stmt = env.DB.prepare(query);
-    const rows = params.length === 2 ? await stmt.bind(params[0], params[1]).all() : await stmt.bind(params[0]).all();
+    const rows = await env.DB.prepare(query).bind(...params).all();
     return jsonResponse({ logs: rows.results });
   }
 
@@ -1052,10 +1071,18 @@ function generateToken() {
 }
 
 function generateCode() {
+  // L4: reject-and-retry to eliminate modulo bias. 2^24 = 16777216, and
+  // 16777216 % 1000000 = 777216, so codes 0..777215 were ~0.0000006% more
+  // likely than 777216..999999 with `num % 1000000`. Drop draws above the
+  // largest multiple of 1e6 below 2^24 (= 16000000) and retry.
   const array = new Uint8Array(3);
-  crypto.getRandomValues(array);
-  const num = (array[0] << 16) | (array[1] << 8) | array[2];
-  return String(num % 1000000).padStart(6, '0');
+  while (true) {
+    crypto.getRandomValues(array);
+    const num = (array[0] << 16) | (array[1] << 8) | array[2];
+    if (num < 16000000) {
+      return String(num % 1000000).padStart(6, '0');
+    }
+  }
 }
 
 // =========================================================================

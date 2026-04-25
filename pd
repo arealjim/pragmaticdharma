@@ -6,6 +6,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DB_NAME="pragmaticdharma"
 
+# H3: SQL-literal escape for user input. Wrangler d1 execute doesn't
+# expose parameterized queries from --command, so any value we
+# interpolate must be escaped. Email / project regexes already exclude
+# single quotes, but apply this as belt-and-suspenders against future
+# regex relaxation. SQLite literal: a single quote is doubled.
+sql_escape() {
+    local s="${1//\'/\'\'}"
+    printf '%s' "$s"
+}
+
 run_sql() {
     cd "$SCRIPT_DIR" && npx wrangler d1 execute "$DB_NAME" --remote --command "$1" 2>/dev/null | \
         python3 -c "
@@ -62,7 +72,8 @@ case "$1" in
         if ! echo "$EMAIL" | grep -qE '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'; then
             echo "Error: Invalid email format"; exit 1
         fi
-        run_sql "UPDATE users SET status = 'approved', updated_at = datetime('now') WHERE email = '$EMAIL';"
+        EMAIL_ESC=$(sql_escape "$EMAIL")
+        run_sql "UPDATE users SET status = 'approved', updated_at = datetime('now') WHERE email = '$EMAIL_ESC';"
         echo "Approved: $EMAIL"
         ;;
     reject)
@@ -71,7 +82,8 @@ case "$1" in
         if ! echo "$EMAIL" | grep -qE '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'; then
             echo "Error: Invalid email format"; exit 1
         fi
-        run_sql "UPDATE users SET status = 'rejected', updated_at = datetime('now') WHERE email = '$EMAIL';"
+        EMAIL_ESC=$(sql_escape "$EMAIL")
+        run_sql "UPDATE users SET status = 'rejected', updated_at = datetime('now') WHERE email = '$EMAIL_ESC';"
         echo "Rejected: $EMAIL"
         ;;
     users)
@@ -107,8 +119,11 @@ case "$1" in
         if ! echo "$LIMIT" | grep -qE '^[0-9]+$'; then
             echo "Error: LIMIT must be a number"; exit 1
         fi
+        # PROJECT regex already excludes quotes; escape anyway. LIMIT is
+        # already validated to ^[0-9]+$ so direct interpolation is safe.
         if [ -n "$PROJECT" ]; then
-            run_sql "SELECT user_email, project, path, ip_address, country, city, created_at FROM access_logs WHERE project = '$PROJECT' ORDER BY created_at DESC LIMIT $LIMIT;"
+            PROJECT_ESC=$(sql_escape "$PROJECT")
+            run_sql "SELECT user_email, project, path, ip_address, country, city, created_at FROM access_logs WHERE project = '$PROJECT_ESC' ORDER BY created_at DESC LIMIT $LIMIT;"
         else
             run_sql "SELECT user_email, project, path, ip_address, country, city, created_at FROM access_logs ORDER BY created_at DESC LIMIT $LIMIT;"
         fi

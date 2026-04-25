@@ -1,6 +1,7 @@
 name = "pragmaticdharma"
 main = "worker.js"
-compatibility_date = "2024-01-01"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
 
 # Import HTML pages as text modules
 [[rules]]
@@ -13,10 +14,15 @@ routes = [
   { pattern = "retreats.pragmaticdharma.org/*", zone_name = "pragmaticdharma.org" }
 ]
 
-# Secrets (set via `wrangler secret put <NAME>`):
-#   JWT_SECRET          — 32 hex bytes, shared with shield worker
-#   RESEND_API_KEY      — Resend transactional email
-#   DISCORD_WEBHOOK_URL — Signup + access notifications
+# JWT_SECRET is bound from the shared "pragmaticdharma" Secrets Store.
+# RESEND_API_KEY and DISCORD_WEBHOOK_URL remain plain Worker secrets
+# (set via `wrangler secret put <NAME>`) until rotation; they'll move to
+# Secrets Store when next rotated. The getSecret helper in worker.js
+# transparently handles both binding types.
+[[secrets_store_secrets]]
+binding     = "JWT_SECRET"
+store_id    = "626a023faf5e4be98729d2f4b9849f09"
+secret_name = "JWT_SECRET"
 
 # D1 database — fill ID after running: wrangler d1 create pragmaticdharma
 [[d1_databases]]

@@ -3,6 +3,22 @@
 // D1 database for users, sessions, access logs
 
 // =========================================================================
+// SECRET ACCESS (works with both plain env vars and Secrets Store bindings)
+// =========================================================================
+
+const _secretCache = new WeakMap();
+async function getSecret(env, name) {
+  if (!env) return undefined;
+  let cache = _secretCache.get(env);
+  if (!cache) { cache = {}; _secretCache.set(env, cache); }
+  if (name in cache) return cache[name];
+  const binding = env[name];
+  if (binding == null) { cache[name] = undefined; return undefined; }
+  cache[name] = typeof binding.get === 'function' ? await binding.get() : binding;
+  return cache[name];
+}
+
+// =========================================================================
 // STATIC PAGES (loaded from pages/ at build time via import)
 // =========================================================================
 
@@ -692,7 +708,7 @@ async function verifyJWT(env, token) {
 }
 
 async function getSigningKey(env) {
-  const secret = env.JWT_SECRET;
+  const secret = await getSecret(env, 'JWT_SECRET');
   return crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(secret),
@@ -793,7 +809,7 @@ function generateCode() {
 // =========================================================================
 
 async function sendMagicLinkEmail(env, email, magicLink, code) {
-  const apiKey = env.RESEND_API_KEY;
+  const apiKey = await getSecret(env, 'RESEND_API_KEY');
   if (!apiKey) {
     console.error('RESEND_API_KEY not configured');
     return false;
@@ -843,7 +859,7 @@ async function sendMagicLinkEmail(env, email, magicLink, code) {
 }
 
 async function sendApprovalEmail(env, email, name) {
-  const apiKey = env.RESEND_API_KEY;
+  const apiKey = await getSecret(env, 'RESEND_API_KEY');
   if (!apiKey) {
     console.error('RESEND_API_KEY not configured');
     return false;
@@ -895,7 +911,7 @@ async function sendApprovalEmail(env, email, name) {
 // =========================================================================
 
 async function notifyDiscord(env, embed) {
-  const webhookUrl = env.DISCORD_WEBHOOK_URL;
+  const webhookUrl = await getSecret(env, 'DISCORD_WEBHOOK_URL');
   if (!webhookUrl) return;
 
   try {

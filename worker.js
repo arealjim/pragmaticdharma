@@ -137,7 +137,31 @@ async function injectPlatformNav(html, request, env, projectName) {
 // MAIN HANDLER
 // =========================================================================
 
+// M4: scheduled handler — daily PII retention sweep on access_logs.
+// access_logs holds email + IP + ISP + UA which is high-value if D1 is
+// compromised. 90 days is the default; drop earlier if business needs
+// don't require longer windows.
+async function runRetentionSweep(env) {
+  if (!env.DB) return;
+  const result = await env.DB.prepare(
+    "DELETE FROM access_logs WHERE created_at < datetime('now', '-90 days')"
+  ).run();
+  console.log(`[retention] purged ${result.meta?.changes || 0} access_logs rows older than 90d`);
+
+  // Also purge old verify_failures (15-min window; anything older is stale).
+  const vf = await env.DB.prepare(
+    "DELETE FROM verify_failures WHERE first_at < strftime('%s', 'now', '-1 day')"
+  ).run();
+  console.log(`[retention] purged ${vf.meta?.changes || 0} verify_failures rows`);
+}
+
 export default {
+  // Cron trigger handler (M4 retention sweep). Configured in wrangler.toml
+  // via [triggers] crons = ["0 4 * * *"] — runs daily at 04:00 UTC.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runRetentionSweep(env));
+  },
+
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -779,20 +803,40 @@ async function handleAdmin(request, env, path, method) {
     return jsonResponse({ logs: rows.results });
   }
 
+  // M7/M8: explicit allowlist for /api/admin/config. Previously the GET
+  // returned every row in the config table (so any future secret accidentally
+  // stored there would leak), and the POST accepted arbitrary keys (so a
+  // compromised admin or a CSRF could write garbage that downstream code
+  // might trust). Allowlist is anchored to actual config concepts.
+  const CONFIG_ALLOWLIST_PREFIXES = ['open_beta'];
+  const isAllowedConfigKey = (key) =>
+    typeof key === 'string' &&
+    CONFIG_ALLOWLIST_PREFIXES.some(p => key === p || key.startsWith(p + ':'));
+
   if (method === 'GET' && route === 'config') {
     const rows = await env.DB.prepare('SELECT key, value FROM config ORDER BY key').all();
     const config = {};
     for (const row of rows.results) {
-      config[row.key] = row.value;
+      if (isAllowedConfigKey(row.key)) {
+        config[row.key] = row.value;
+      }
     }
     return jsonResponse({ config: config });
   }
 
   if (method === 'POST' && route === 'config') {
     const body = await request.json();
+    const rejected = [];
     for (const [key, value] of Object.entries(body)) {
+      if (!isAllowedConfigKey(key)) {
+        rejected.push(key);
+        continue;
+      }
       await env.DB.prepare('INSERT INTO config (key, value, updated_at) VALUES (?, ?, datetime(\'now\')) ON CONFLICT(key) DO UPDATE SET value = ?, updated_at = datetime(\'now\')')
         .bind(key, String(value), String(value)).run();
+    }
+    if (rejected.length > 0) {
+      return jsonResponse({ ok: false, error: 'Some keys not in config allowlist', rejected }, 400);
     }
     return jsonResponse({ ok: true });
   }

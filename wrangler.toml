@@ -14,6 +14,11 @@ routes = [
   { pattern = "retreats.pragmaticdharma.org/*", zone_name = "pragmaticdharma.org" }
 ]
 
+# M4: daily access_logs PII retention sweep (deletes rows > 90 days old).
+# 04:00 UTC = quietest hour for the platform.
+[triggers]
+crons = ["0 4 * * *"]
+
 # Per-service JWT keys (Task #2). The platform Worker holds ALL signing
 # keys: each sub-service has its own key in the Secrets Store, the platform
 # picks the right one to sign each JWT based on the destination subdomain

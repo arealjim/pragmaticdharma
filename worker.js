@@ -30,7 +30,7 @@ import ADMIN_HTML from './pages/admin.html';
 import RETREATS_HTML from './pages/retreats.html';
 import NAV_BAR_HTML from './shared/nav-bar.html';
 
-const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice'];
+const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice', 'sentinel'];
 
 // H6: explicit allowlist of redirect destinations. Previously the regex
 // allowed any *.pragmaticdharma.org subdomain — a dangling DNS / takeover
@@ -41,6 +41,7 @@ const REDIRECT_ALLOWLIST = new Set([
   'pragmaticdharma.org',
   'retreats.pragmaticdharma.org',
   'health.pragmaticdharma.org',
+  'sentinel.pragmaticdharma.org',
   'shield.pragmaticdharma.org',
   'psychology.pragmaticdharma.org',
   'mindreader.pragmaticdharma.org',
@@ -63,6 +64,7 @@ function redirectUrlToProject(url) {
   // Map subdomain URLs to project keys
   const map = {
     'health.pragmaticdharma.org': 'health',
+    'sentinel.pragmaticdharma.org': 'sentinel',
     'shield.pragmaticdharma.org': 'shield',
     'psychology.pragmaticdharma.org': 'ego-assessment',
     'mindreader.pragmaticdharma.org': 'mindreader',

@@ -39,7 +39,7 @@ Project access changes (via admin dashboard or `user-projects` API) take effect 
 
 ## Sub-Projects
 
-All 7 sub-projects are now Cloudflare Workers (Pages migration complete 2026-04-25). Each verifies JWTs with its own per-service key (Task #2 — `kid` claim selects the right key).
+All 8 sub-projects are now Cloudflare Workers (Pages migration complete 2026-04-25). Each verifies JWTs with its own per-service key (Task #2 — `kid` claim selects the right key).
 
 | Subdomain | Worker | Auth Style | Notes |
 |-----------|--------|------------|-------|
@@ -48,10 +48,13 @@ All 7 sub-projects are now Cloudflare Workers (Pages migration complete 2026-04-
 | psychtools.pragmaticdharma.org | `psychtools-workers` | worker-gate (302/403) | DBT skills; static + /api/feedback |
 | astrology.pragmaticdharma.org | `astrology-workers` | worker-gate (302/403) | Frontend + devbox Claude proxy at `astrology-api.pragmaticdharma.org` |
 | practice.pragmaticdharma.org | `practice-workers` | worker-gate (302/403) | Frontend + devbox Claude proxy at `practice-api.pragmaticdharma.org` |
+| sentinel.pragmaticdharma.org | `sentinel-web` | worker-gate (302/403) + admin-email allowlist | Admin-only preparedness dashboard; reads `sentinel_*` tables in shared D1 |
 | psychology.pragmaticdharma.org | `ego-assessment-workers` | api-gate (401) | Ego development assessment; Anthropic API |
 | health.pragmaticdharma.org | `tcm-tracker` (Flask via cloudflared) | api-gate (401) | Health tracking on devbox |
 
 The legacy magic-link auth (ego_session) was retired. Subdomain `ego-assessment.pages.dev` is going away once the old Pages project is deleted.
+
+**Sentinel temporary signing-key state (2026-05-25):** `KID_TO_BINDING['sentinel']` currently maps to `JWT_SECRET_PRAGMATICDHARMA` rather than a per-project `JWT_SECRET_SENTINEL`. The wrangler secrets-store beta CLI couldn't create the per-project entry (defaulted to local-only mode without `--remote`); the keepass DB password to retry via dashboard wasn't immediately available. Sentinel-web's `wrangler.toml` binds its `JWT_SECRET` to the same `JWT_SECRET_PRAGMATICDHARMA` entry so sign value ≡ verify value. To restore per-project rotation independence: create `JWT_SECRET_SENTINEL` via the dashboard, then flip `KID_TO_BINDING['sentinel']` in this repo AND `secret_name` in `~/workspace/sentinel-web/wrangler.toml` in the same change.
 
 ## Secrets
 

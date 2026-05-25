@@ -900,6 +900,16 @@ const KID_TO_BINDING = {
   // tcm-tracker (health) — has its own per-service key in the Store and on
   // /etc/tcm-tracker/env. Rotated 2026-04-25 (Task #20).
   'health':           'JWT_SECRET_HEALTH',
+  // sentinel (Phase 3, 2026-05-25) — temporarily reuses JWT_SECRET_PRAGMATICDHARMA
+  // because the per-project JWT_SECRET_SENTINEL entry could not be created via
+  // the beta secrets-store CLI (and keepass DB password was not immediately
+  // available to recreate via dashboard). Same key VALUE either way — the
+  // canonical JWT signing secret is shared across all platform projects today
+  // (per-binding rotation is what's being deferred, not key separation in
+  // value). When JWT_SECRET_SENTINEL exists in the Secrets Store, flip this
+  // line to 'JWT_SECRET_SENTINEL' and update sentinel-web/wrangler.toml in
+  // the same change.
+  'sentinel':         'JWT_SECRET_PRAGMATICDHARMA',
 };
 
 async function getSigningKeyForKid(env, kid) {

@@ -30,7 +30,7 @@ import ADMIN_HTML from './pages/admin.html';
 import RETREATS_HTML from './pages/retreats.html';
 import NAV_BAR_HTML from './shared/nav-bar.html';
 
-const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice', 'sentinel'];
+const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice', 'sentinel', 'bromnichord'];
 
 // H6: explicit allowlist of redirect destinations. Previously the regex
 // allowed any *.pragmaticdharma.org subdomain — a dangling DNS / takeover
@@ -48,6 +48,7 @@ const REDIRECT_ALLOWLIST = new Set([
   'psychtools.pragmaticdharma.org',
   'astrology.pragmaticdharma.org',
   'practice.pragmaticdharma.org',
+  'bromnichord.pragmaticdharma.org',
 ]);
 
 function validateRedirectUrl(url) {
@@ -71,6 +72,7 @@ function redirectUrlToProject(url) {
     'psychtools.pragmaticdharma.org': 'psychtools',
     'astrology.pragmaticdharma.org': 'astrology',
     'practice.pragmaticdharma.org': 'practice',
+    'bromnichord.pragmaticdharma.org': 'bromnichord',
   };
   try {
     const host = new URL(url).hostname;
@@ -910,6 +912,7 @@ const KID_TO_BINDING = {
   // line to 'JWT_SECRET_SENTINEL' and update sentinel-web/wrangler.toml in
   // the same change.
   'sentinel':         'JWT_SECRET_PRAGMATICDHARMA',
+  'bromnichord':      'JWT_SECRET_BROMNICHORD',
 };
 
 async function getSigningKeyForKid(env, kid) {

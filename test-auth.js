@@ -256,6 +256,7 @@ function readKeys() {
     'ego-assessment': process.env.JWT_SECRET_EGO_ASSESSMENT  || fallback,
     practice:         process.env.JWT_SECRET_PRACTICE        || fallback,
     health:           process.env.JWT_SECRET_HEALTH          || fallback,
+    bromnichord:      process.env.JWT_SECRET_BROMNICHORD     || fallback,
   };
 }
 
@@ -266,17 +267,18 @@ async function main() {
     console.error(`${COLORS.red}Error: per-service JWT keys required. Set:${COLORS.reset}`);
     console.error('  JWT_SECRET_SHIELD, JWT_SECRET_MINDREADER, JWT_SECRET_PSYCHTOOLS,');
     console.error('  JWT_SECRET_ASTROLOGY, JWT_SECRET_EGO_ASSESSMENT, JWT_SECRET_PRACTICE,');
-    console.error('  JWT_SECRET_HEALTH (or JWT_SECRET as a single fallback for all).');
+    console.error('  JWT_SECRET_HEALTH, JWT_SECRET_BROMNICHORD (or JWT_SECRET as a single fallback for all).');
     process.exit(2);
   }
 
   console.log(`${COLORS.bold}Auth Enforcement Tests${COLORS.reset}`);
-  console.log(`${COLORS.dim}Testing 6 sites × 7 scenarios + 3 ego critical-endpoint tests = 45 tests${COLORS.reset}`);
+  console.log(`${COLORS.dim}Testing 7 sites × 7 scenarios + 3 ego critical-endpoint tests = 52 tests${COLORS.reset}`);
 
   const sites = [
     { name: 'Psychic Shield', url: 'https://shield.pragmaticdharma.org/',                   projectKey: 'shield',          authStyle: 'worker-gate', kid: 'shield' },
     { name: 'Mind Reader',    url: 'https://mindreader.pragmaticdharma.org/',               projectKey: 'mindreader',      authStyle: 'worker-gate', kid: 'mindreader' },
     { name: 'PsychTools',     url: 'https://psychtools.pragmaticdharma.org/',               projectKey: 'psychtools',      authStyle: 'worker-gate', kid: 'psychtools' },
+    { name: 'Bromnichord',    url: 'https://bromnichord.pragmaticdharma.org/',              projectKey: 'bromnichord',     authStyle: 'worker-gate', kid: 'bromnichord' },
     { name: 'Transit Viewer', url: 'https://astrology.pragmaticdharma.org/',                projectKey: 'astrology',       authStyle: 'worker-gate', kid: 'astrology' },
     { name: 'Ego Assessment', url: 'https://psychology.pragmaticdharma.org/api/profile',    projectKey: 'ego-assessment',  authStyle: 'api-gate',    kid: 'ego-assessment' },
     { name: 'Health Tracker', url: 'https://health.pragmaticdharma.org/api/mood/trends',    projectKey: 'health',          authStyle: 'api-gate',    kid: 'health' },

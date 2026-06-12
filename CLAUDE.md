@@ -39,7 +39,7 @@ Project access changes (via admin dashboard or `user-projects` API) take effect 
 
 ## Sub-Projects
 
-All 8 sub-projects are now Cloudflare Workers (Pages migration complete 2026-04-25). Each verifies JWTs with its own per-service key (Task #2 — `kid` claim selects the right key).
+All 9 sub-projects are now Cloudflare Workers (Pages migration complete 2026-04-25). Each verifies JWTs with its own per-service key (Task #2 — `kid` claim selects the right key).
 
 | Subdomain | Worker | Auth Style | Notes |
 |-----------|--------|------------|-------|
@@ -51,6 +51,7 @@ All 8 sub-projects are now Cloudflare Workers (Pages migration complete 2026-04-
 | sentinel.pragmaticdharma.org | `sentinel-web` | worker-gate (302/403) + admin-email allowlist | Admin-only preparedness dashboard; reads `sentinel_*` tables in shared D1 |
 | psychology.pragmaticdharma.org | `ego-assessment-workers` | api-gate (401) | Ego development assessment; Anthropic API |
 | health.pragmaticdharma.org | `tcm-tracker` (Flask via cloudflared) | api-gate (401) | Health tracking on devbox |
+| bromnichord.pragmaticdharma.org | `bromnichord-workers` | worker-gate (302/403) | Chiptune omnichord instrument; static assets only |
 
 The legacy magic-link auth (ego_session) was retired. Subdomain `ego-assessment.pages.dev` is going away once the old Pages project is deleted.
 
@@ -61,7 +62,7 @@ The legacy magic-link auth (ego_session) was retired. Subdomain `ego-assessment.
 All platform secrets live in **Cloudflare Secrets Store** under store name `pragmaticdharma` (id `626a023faf5e4be98729d2f4b9849f09`). Each service binds only its own keys; the platform Worker holds all of them so it can sign JWTs for any destination.
 
 **Per-service JWT signing keys** (one per service, named `JWT_SECRET_<SERVICE>`):
-- `JWT_SECRET_PRAGMATICDHARMA`, `JWT_SECRET_EGO_ASSESSMENT`, `JWT_SECRET_SHIELD`, `JWT_SECRET_MINDREADER`, `JWT_SECRET_PSYCHTOOLS`, `JWT_SECRET_ASTROLOGY`, `JWT_SECRET_PRACTICE`, `JWT_SECRET_HEALTH`
+- `JWT_SECRET_PRAGMATICDHARMA`, `JWT_SECRET_EGO_ASSESSMENT`, `JWT_SECRET_SHIELD`, `JWT_SECRET_MINDREADER`, `JWT_SECRET_PSYCHTOOLS`, `JWT_SECRET_ASTROLOGY`, `JWT_SECRET_PRACTICE`, `JWT_SECRET_HEALTH`, `JWT_SECRET_BROMNICHORD`
 - The platform Worker sets `kid: <service>` in the JWT header so each verifier picks the right key.
 
 **Other shared secrets:** `OWNER_EMAIL`.

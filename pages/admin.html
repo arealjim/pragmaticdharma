@@ -106,6 +106,10 @@
       <span class="toggle-label">PsychTools</span>
       <label class="toggle-switch"><input type="checkbox" id="beta-psychtools" onchange="toggleBeta('open_beta:psychtools',this.checked)"><span class="toggle-slider"></span></label>
     </div>
+    <div class="toggle-row">
+      <span class="toggle-label">Bromnichord</span>
+      <label class="toggle-switch"><input type="checkbox" id="beta-bromnichord" onchange="toggleBeta('open_beta:bromnichord',this.checked)"><span class="toggle-slider"></span></label>
+    </div>
   </div>
 
   <h2>Project Stats</h2>
@@ -157,6 +161,7 @@
         el = document.getElementById('beta-ego-assessment'); if (el) el.checked = c['open_beta:ego-assessment'] === 'true';
         el = document.getElementById('beta-mindreader'); if (el) el.checked = c['open_beta:mindreader'] === 'true';
         el = document.getElementById('beta-psychtools'); if (el) el.checked = c['open_beta:psychtools'] === 'true';
+        el = document.getElementById('beta-bromnichord'); if (el) el.checked = c['open_beta:bromnichord'] === 'true';
       });
   }
 
@@ -268,8 +273,8 @@
       });
   }
 
-  var ALL_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice', 'sentinel'];
-  var PROJECT_LABELS = { health: 'Health', shield: 'Shield', 'ego-assessment': 'Ego', mindreader: 'Mind Reader', psychtools: 'PsychTools', astrology: 'Astrology', practice: 'Practice', sentinel: 'Sentinel' };
+  var ALL_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice', 'sentinel', 'bromnichord'];
+  var PROJECT_LABELS = { health: 'Health', shield: 'Shield', 'ego-assessment': 'Ego', mindreader: 'Mind Reader', psychtools: 'PsychTools', astrology: 'Astrology', practice: 'Practice', sentinel: 'Sentinel', bromnichord: 'Bromnichord' };
   var usersData = [];
   var healthUsers = {}; // email -> {id, opus_enabled}
 

@@ -20,6 +20,7 @@ Services and their Worker names:
 | `astrology.pragmaticdharma.org` | `astrology-workers` | Transit interpreter (frontend) |
 | `practice.pragmaticdharma.org` | `practice-workers` | Cycle-aware task management (frontend) |
 | `health.pragmaticdharma.org` | `tcm-tracker` (Flask via cloudflared) | Health tracking |
+| `bromnichord.pragmaticdharma.org` | `bromnichord-workers` | Chiptune omnichord instrument |
 
 Two services have devbox-side Node proxies for the Claude CLI (`astrology-api.pragmaticdharma.org`, `practice-api.pragmaticdharma.org`) reachable via cloudflared tunnel. They run as systemd units on devbox.
 

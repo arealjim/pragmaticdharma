@@ -72,6 +72,11 @@ binding     = "JWT_SECRET_HEALTH"
 store_id    = "626a023faf5e4be98729d2f4b9849f09"
 secret_name = "JWT_SECRET_HEALTH"
 
+[[secrets_store_secrets]]
+binding     = "JWT_SECRET_BROMNICHORD"
+store_id    = "626a023faf5e4be98729d2f4b9849f09"
+secret_name = "JWT_SECRET_BROMNICHORD"
+
 # D1 database — fill ID after running: wrangler d1 create pragmaticdharma
 [[d1_databases]]
 binding = "DB"

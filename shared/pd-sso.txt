@@ -1,0 +1,111 @@
+/*
+ * pd-sso.js — shared client helper for pragmaticdharma.org SSO.
+ *
+ * The platform issues ONE shared pd_session cookie (Domain=.pragmaticdharma.org)
+ * but signs it with PER-SERVICE keys (kid header → the destination's key). A
+ * token minted for one sub-app therefore cannot be verified by another, so a
+ * user who logged in elsewhere arrives at this app with a present-but-
+ * unverifiable cookie and looks logged out even though their platform session
+ * is valid.
+ *
+ * This helper detects that case — the sub-app's own session endpoint reports
+ * `tokenPresentButInvalid: true` because only THAT Worker knows whether its
+ * key verifies the cookie — and transparently re-mints the cookie for THIS
+ * origin via the platform's /api/refresh-session, which re-signs for
+ * window.location.origin and 302s back. It is guarded to one attempt per tab
+ * so a cookie that genuinely can't be upgraded (e.g. truly expired, which
+ * refresh-session answers with the login form) can never loop.
+ *
+ * Hosted at https://pragmaticdharma.org/pd-sso.js and loaded by every sub-app:
+ *
+ *   <script src="https://pragmaticdharma.org/pd-sso.js"></script>
+ *
+ * Manual use (when you need the resolved session data inline):
+ *   const r = await PdSSO.ensureSession({ statusUrl: '/api/auth/session' });
+ *   if (r.redirecting) return;              // page is navigating to re-mint
+ *   if (r.authenticated) { ...apply r.data... }
+ *
+ * Auto use (zero glue): set window.PD_SSO_CONFIG = { statusUrl, auto: true }
+ * before loading this script. It runs ensureSession on load and, for the
+ * non-redirecting outcomes, dispatches a 'pd-sso:resolved' CustomEvent whose
+ * detail is the result object.
+ *
+ * The sub-app backend contract (the only per-app requirement): the status
+ * endpoint must return JSON with `authenticated` (bool) and, when not
+ * authenticated, `tokenPresentButInvalid` (bool — true iff a pd_session cookie
+ * was present but failed to verify with this service's key).
+ */
+(function () {
+  var REFRESH_URL = 'https://pragmaticdharma.org/api/refresh-session';
+  var GUARD_KEY = 'pd-session-resync-attempted';
+
+  function onPdDomain() {
+    return location.hostname === 'pragmaticdharma.org'
+        || location.hostname.endsWith('.pragmaticdharma.org');
+  }
+  function guardSet() {
+    try { return sessionStorage.getItem(GUARD_KEY) === '1'; } catch (e) { return false; }
+  }
+  function setGuard() {
+    try { sessionStorage.setItem(GUARD_KEY, '1'); } catch (e) {}
+  }
+  function clearGuard() {
+    try { sessionStorage.removeItem(GUARD_KEY); } catch (e) {}
+  }
+
+  // Top-level navigation to the platform re-mint endpoint. refresh-session
+  // re-signs the shared cookie with this origin's key and 302s back here.
+  function refreshNow() {
+    setGuard();
+    location.href = REFRESH_URL + '?redirect=' + encodeURIComponent(location.origin);
+  }
+
+  // opts: { statusUrl, isAuthenticated(data), needsResync(data) }
+  // Resolves to { authenticated, redirecting, data, error? }. When redirecting
+  // is true the page is already navigating away — callers should stop.
+  async function ensureSession(opts) {
+    opts = opts || {};
+    var statusUrl = opts.statusUrl || '/api/auth/session';
+    var isAuthenticated = opts.isAuthenticated || function (d) { return !!(d && d.authenticated); };
+    var needsResync = opts.needsResync || function (d) { return !!(d && d.tokenPresentButInvalid); };
+
+    var data = null;
+    try {
+      var res = await fetch(statusUrl, {
+        credentials: 'include',
+        headers: { 'Accept': 'application/json' }
+      });
+      data = await res.json();
+    } catch (e) {
+      return { authenticated: false, redirecting: false, data: null, error: e };
+    }
+
+    if (isAuthenticated(data)) {
+      clearGuard();
+      return { authenticated: true, redirecting: false, data: data };
+    }
+
+    if (needsResync(data) && onPdDomain() && !guardSet()) {
+      refreshNow();
+      return { authenticated: false, redirecting: true, data: data };
+    }
+
+    return { authenticated: false, redirecting: false, data: data };
+  }
+
+  window.PdSSO = {
+    ensureSession: ensureSession,
+    refreshNow: refreshNow,
+    clearResyncGuard: clearGuard,
+    guardKey: GUARD_KEY
+  };
+
+  var cfg = window.PD_SSO_CONFIG;
+  if (cfg && cfg.auto) {
+    ensureSession(cfg).then(function (r) {
+      if (!r.redirecting) {
+        try { window.dispatchEvent(new CustomEvent('pd-sso:resolved', { detail: r })); } catch (e) {}
+      }
+    });
+  }
+})();

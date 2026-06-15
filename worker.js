@@ -29,6 +29,10 @@ import RESOURCES_HTML from './pages/resources.html';
 import ADMIN_HTML from './pages/admin.html';
 import RETREATS_HTML from './pages/retreats.html';
 import NAV_BAR_HTML from './shared/nav-bar.html';
+// Served verbatim at GET /pd-sso.js. Stored as .txt so wrangler's built-in
+// Text module rule (**/*.txt) bundles it as a string without the .js ESM
+// loader also claiming it.
+import PD_SSO_CLIENT from './shared/pd-sso.txt';
 
 const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice', 'sentinel', 'bromnichord'];
 
@@ -179,6 +183,20 @@ export default {
     // Health check
     if (path === '/health') {
       return new Response('ok', { headers: { 'content-type': 'text/plain' } });
+    }
+
+    // Shared SSO client, loaded cross-origin by every sub-app. Served from any
+    // host this Worker answers on; sub-apps reference the apex URL. Short cache
+    // so fixes propagate fleet-wide quickly without re-deploying each app.
+    if (method === 'GET' && path === '/pd-sso.js') {
+      return new Response(PD_SSO_CLIENT, {
+        headers: {
+          'content-type': 'application/javascript; charset=utf-8',
+          'cache-control': 'public, max-age=300',
+          'access-control-allow-origin': '*',
+          'x-content-type-options': 'nosniff',
+        },
+      });
     }
 
     // Subdomain routing: retreats.pragmaticdharma.org

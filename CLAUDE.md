@@ -1,5 +1,7 @@
 # pragmaticdharma
 
+> **Facts** · runs-on: Cloudflare edge · deploys-to: pragmaticdharma.org · depends-on: none (it's the hub; subprojects depend on it) · map: `machine-setup/docs/portfolio-map.md`
+
 Platform portal and auth system for pragmaticdharma.org. Serves the landing page, handles user signup/login (magic link via Resend), admin approval workflow, and provides shared JWT auth for sub-projects.
 
 ## Quick Reference
@@ -46,11 +48,11 @@ All 10 sub-projects are Cloudflare Workers (Pages migration complete 2026-04-25;
 | shield.pragmaticdharma.org | `psychic-shield` | worker-gate (302/403) | Briefing reader; D1 + KV |
 | mindreader.pragmaticdharma.org | `mind-reader-workers` | worker-gate (302/403) | Biometric SPA; on-device ML, no Claude |
 | psychtools.pragmaticdharma.org | `psychtools-workers` | worker-gate (302/403) | DBT skills; static + /api/feedback |
-| astrology.pragmaticdharma.org | `astrology-workers` | worker-gate (302/403) | Frontend + devbox Claude proxy at `astrology-api.pragmaticdharma.org` |
-| practice.pragmaticdharma.org | `practice-workers` | worker-gate (302/403) | Frontend + devbox Claude proxy at `practice-api.pragmaticdharma.org` |
+| astrology.pragmaticdharma.org | `astrology-workers` | worker-gate (302/403) | Frontend + biggie Claude proxy at `astrology-api.pragmaticdharma.org` |
+| practice.pragmaticdharma.org | `practice-workers` | worker-gate (302/403) | Frontend + biggie Claude proxy at `practice-api.pragmaticdharma.org` |
 | sentinel.pragmaticdharma.org | `sentinel-web` | worker-gate (302/403) + admin-email allowlist | Admin-only preparedness dashboard; reads `sentinel_*` tables in shared D1 |
 | psychology.pragmaticdharma.org | `ego-assessment-workers` | api-gate (401) | Ego development assessment; Anthropic API |
-| health.pragmaticdharma.org | `tcm-tracker` (Flask via cloudflared) | api-gate (401) | Health tracking on devbox |
+| health.pragmaticdharma.org | `tcm-tracker` (Flask via cloudflared) | api-gate (401) | Health tracking on biggie |
 | bromnichord.pragmaticdharma.org | `bromnichord-workers` | worker-gate (302/403) | Chiptune omnichord instrument; static assets only |
 | discern.pragmaticdharma.org | `discern-workers` | worker-gate (302/403) | Calibration training game (~/workspace/discern); static assets only, localStorage data |
 

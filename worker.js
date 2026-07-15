@@ -34,7 +34,7 @@ import NAV_BAR_HTML from './shared/nav-bar.html';
 // loader also claiming it.
 import PD_SSO_CLIENT from './shared/pd-sso.txt';
 
-const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice', 'sentinel', 'bromnichord', 'discern'];
+const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice', 'sentinel', 'bromnichord', 'discern', 'review'];
 
 // H6: explicit allowlist of redirect destinations. Previously the regex
 // allowed any *.pragmaticdharma.org subdomain — a dangling DNS / takeover
@@ -54,6 +54,7 @@ const REDIRECT_ALLOWLIST = new Set([
   'practice.pragmaticdharma.org',
   'bromnichord.pragmaticdharma.org',
   'discern.pragmaticdharma.org',
+  'review.pragmaticdharma.org',
 ]);
 
 function validateRedirectUrl(url) {
@@ -79,6 +80,7 @@ function redirectUrlToProject(url) {
     'practice.pragmaticdharma.org': 'practice',
     'bromnichord.pragmaticdharma.org': 'bromnichord',
     'discern.pragmaticdharma.org': 'discern',
+    'review.pragmaticdharma.org': 'review',
   };
   try {
     const host = new URL(url).hostname;
@@ -934,6 +936,7 @@ const KID_TO_BINDING = {
   'sentinel':         'JWT_SECRET_PRAGMATICDHARMA',
   'bromnichord':      'JWT_SECRET_BROMNICHORD',
   'discern':          'JWT_SECRET_DISCERN',
+  'review':           'JWT_SECRET_REVIEW',
 };
 
 async function getSigningKeyForKid(env, kid) {

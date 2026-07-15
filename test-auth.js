@@ -44,9 +44,9 @@ function makePayload(projects, opts = {}) {
   const now = Math.floor(Date.now() / 1000);
   const payload = {
     sub: 'test-user-id',
-    email: 'test@example.com',
+    email: opts.email || 'test@example.com',
     name: 'Test User',
-    role: 'user',
+    role: opts.role || 'user',
     iat: now,
     exp: opts.expired ? now - 3600 : now + 3600,
   };
@@ -175,6 +175,50 @@ async function testSite(name, url, projectKey, secret, authStyle, kid) {
 }
 
 /**
+ * Review app (review.pragmaticdharma.org) has a STRICTER gate than the other
+ * worker-gate sites: valid JWT AND project `review` AND role === 'admin' AND
+ * an allow-listed email (Jim). Standard testSite scenarios assume project ⇒
+ * 200, which is false here, so review gets its own policy test.
+ */
+async function testReviewSite(secret) {
+  const url = 'https://review.pragmaticdharma.org/';
+  const kid = 'review';
+  const ADMIN_EMAIL = 'jimirving2@gmail.com';
+  console.log(`\n${COLORS.cyan}${COLORS.bold}ODF Review${COLORS.reset} ${COLORS.dim}${url} (admin + email allowlist)${COLORS.reset}`);
+  let passed = 0, failed = 0;
+
+  async function check(label, cookie, expected, target = url, method = 'GET', headers = {}) {
+    try {
+      const h = { ...headers };
+      if (cookie) h['Cookie'] = `pd_session=${cookie}`;
+      const resp = await fetch(target, { method, headers: h, redirect: 'manual' });
+      if (statusMatches(resp.status, expected)) { console.log(pass(`${label} → ${resp.status}`)); passed++; }
+      else { console.log(fail(`${label} → ${resp.status}`, `expected ${expected.join('|')}`)); failed++; }
+    } catch (err) { console.log(fail(`${label} → ERROR`, err.message)); failed++; }
+  }
+
+  // No cookie → redirect to login.
+  await check('No cookie', null, [302, 301]);
+  // Admin + allow-listed email + project → 200.
+  const good = await signJWT(makePayload(['review'], { role: 'admin', email: ADMIN_EMAIL }), secret, kid);
+  await check('Admin + allowed email + project', good, [200]);
+  // Non-admin with project + allowed email → 403 (admin required).
+  const nonAdmin = await signJWT(makePayload(['review'], { role: 'user', email: ADMIN_EMAIL }), secret, kid);
+  await check('Non-admin (role user) → forbidden', nonAdmin, [403]);
+  // Admin with project but non-allow-listed email → 403.
+  const wrongEmail = await signJWT(makePayload(['review'], { role: 'admin', email: 'someone.else@example.com' }), secret, kid);
+  await check('Admin, non-allowlisted email → forbidden', wrongEmail, [403]);
+  // Admin + allowed email but missing project → refresh bounce (302) or, if
+  // already refreshed, 403.
+  const noProject = await signJWT(makePayload(['other'], { role: 'admin', email: ADMIN_EMAIL }), secret, kid);
+  await check('Admin + allowed email, missing project', noProject, [302, 403]);
+  // Ingest endpoint without a bearer token → 401 (not the cookie gate).
+  await check('POST /api/ingest without bearer', null, [401], 'https://review.pragmaticdharma.org/api/ingest', 'POST', { 'Content-Type': 'application/json' });
+
+  return { passed, failed };
+}
+
+/**
  * Critical-endpoint auth tests for ego-development-app-api.
  *
  * Targets endpoints identified in the 2026-04-23 security review as
@@ -258,6 +302,7 @@ function readKeys() {
     health:           process.env.JWT_SECRET_HEALTH          || fallback,
     bromnichord:      process.env.JWT_SECRET_BROMNICHORD     || fallback,
     discern:          process.env.JWT_SECRET_DISCERN         || fallback,
+    review:           process.env.JWT_SECRET_REVIEW          || fallback,
   };
 }
 
@@ -273,7 +318,7 @@ async function main() {
   }
 
   console.log(`${COLORS.bold}Auth Enforcement Tests${COLORS.reset}`);
-  console.log(`${COLORS.dim}Testing 8 sites × 7 scenarios + 3 ego critical-endpoint tests = 59 tests${COLORS.reset}`);
+  console.log(`${COLORS.dim}Testing 8 sites × 7 scenarios + 6 review-policy tests + 3 ego critical-endpoint tests${COLORS.reset}`);
 
   const sites = [
     { name: 'Psychic Shield', url: 'https://shield.pragmaticdharma.org/',                   projectKey: 'shield',          authStyle: 'worker-gate', kid: 'shield' },
@@ -295,6 +340,10 @@ async function main() {
     totalPassed += passed;
     totalFailed += failed;
   }
+
+  const review = await testReviewSite(keys.review);
+  totalPassed += review.passed;
+  totalFailed += review.failed;
 
   const ego = await testEgoCriticals();
   totalPassed += ego.passed;

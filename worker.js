@@ -449,9 +449,10 @@ async function handleLogin(request, env) {
   const code = generateCode();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
+  // Gap 2 (pd-auth-delta): store the hash, mail the raw token.
   await env.DB.prepare(
     'INSERT INTO magic_links (token, code, email, user_id, expires_at) VALUES (?, ?, ?, ?, ?)'
-  ).bind(token, code, email, user.id, expiresAt).run();
+  ).bind(await sha256Hex(token), code, email, user.id, expiresAt).run();
 
   // Send email via Resend
   const baseUrl = new URL(request.url).origin;
@@ -481,9 +482,12 @@ async function handleVerifyLink(token, request, env) {
     return redirectWithError('Invalid link');
   }
 
+  // Gap 2 (pd-auth-delta): rows are stored hashed; look up by hash. The raw
+  // fallback covers links minted by the previous deploy (15-min lifetime) —
+  // safe to drop after the first deploy has been live an hour.
   const link = await env.DB.prepare(
-    'SELECT token, email, user_id, expires_at, used_at FROM magic_links WHERE token = ?'
-  ).bind(token).first();
+    'SELECT token, email, user_id, expires_at, used_at FROM magic_links WHERE token IN (?, ?)'
+  ).bind(await sha256Hex(token), token).first();
 
   if (!link || link.used_at) {
     return redirectWithError('Link expired or already used');
@@ -622,9 +626,10 @@ async function handleVerifyCode(request, env) {
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   const ua = request.headers.get('User-Agent') || 'unknown';
 
+  // Gap 2 (pd-auth-delta): store the hash; the JWT carries the raw token.
   await env.DB.prepare(
     'INSERT INTO sessions (token, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)'
-  ).bind(sessionToken, user.id, expiresAt, ip, ua).run();
+  ).bind(await sha256Hex(sessionToken), user.id, expiresAt, ip, ua).run();
 
   const projectRows = await env.DB.prepare('SELECT project FROM user_projects WHERE user_id = ?').bind(user.id).all();
   const projects = projectRows.results.map(function(r) { return r.project; });
@@ -730,8 +735,9 @@ async function handleLogout(request, env) {
   if (jwt) {
     const payload = await verifyJWT(env, jwt);
     if (payload && payload.sessionToken) {
-      await env.DB.prepare('UPDATE sessions SET revoked_at = datetime(\'now\') WHERE token = ?')
-        .bind(payload.sessionToken).run().catch(() => {});
+      // Gap 2 (pd-auth-delta): hashed lookup, raw fallback for pre-deploy rows.
+      await env.DB.prepare('UPDATE sessions SET revoked_at = datetime(\'now\') WHERE token IN (?, ?)')
+        .bind(await sha256Hex(payload.sessionToken), payload.sessionToken).run().catch(() => {});
     }
   }
 
@@ -1011,10 +1017,13 @@ async function verifyJWT(env, token) {
     if (!payload.exp || payload.exp < Math.floor(Date.now() / 1000)) return null;
 
     // H2: revocation check via sessions table.
+    // Gap 2 (pd-auth-delta): rows are stored hashed; look up by hash. The raw
+    // fallback keeps sessions minted before the hash-at-rest deploy alive
+    // (30-day lifetime) — safe to drop 30 days after that deploy.
     if (payload.sessionToken && env.DB) {
       const session = await env.DB.prepare(
-        'SELECT revoked_at FROM sessions WHERE token = ?'
-      ).bind(payload.sessionToken).first();
+        'SELECT revoked_at FROM sessions WHERE token IN (?, ?)'
+      ).bind(await sha256Hex(payload.sessionToken), payload.sessionToken).first();
       if (!session || session.revoked_at) return null;
     }
 
@@ -1070,9 +1079,10 @@ async function createSessionAndRedirect(userId, email, request, env, redirect) {
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   const ua = request.headers.get('User-Agent') || 'unknown';
 
+  // Gap 2 (pd-auth-delta): store the hash; the JWT carries the raw token.
   await env.DB.prepare(
     'INSERT INTO sessions (token, user_id, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)'
-  ).bind(sessionToken, user.id, expiresAt, ip, ua).run();
+  ).bind(await sha256Hex(sessionToken), user.id, expiresAt, ip, ua).run();
 
   const projectRows = await env.DB.prepare('SELECT project FROM user_projects WHERE user_id = ?').bind(user.id).all();
   const projects = projectRows.results.map(function(r) { return r.project; });
@@ -1121,6 +1131,16 @@ function generateToken() {
   const array = new Uint8Array(32);
   crypto.getRandomValues(array);
   return Array.from(array, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Gap 2 (pd-auth-delta): tokens are stored as SHA-256 hashes in D1, so D1
+// read access (leaked API token, backup, wrangler session) can't hijack a
+// live session or an unused magic link. The raw token lives only in the
+// email link / JWT cookie; lookups hash the presented value first. Tokens
+// are 256-bit random, so a plain unsalted hash is sufficient.
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
 }
 
 function generateCode() {

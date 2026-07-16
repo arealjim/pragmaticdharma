@@ -105,7 +105,9 @@ For deferred items: prompt files live at `~/prompts/`. See the remediation track
 
 ## Testing
 
-Auth enforcement integration tests verify that all 6 subdomains correctly grant/deny access based on JWT `projects` claims.
+**Unit tests** (local, no network): `npm test` — runs `test/*.test.mjs` under `node --test` against the real worker fetch handler, with an in-memory D1 (node:sqlite adapter, `test/fake-d1.mjs`) and stubbed outbound fetch. Loader hooks in `test/register-stubs.mjs` stub the wrangler text-module imports. Covers the auth flows: magic-link/code verify (atomic single-use), token hash-at-rest, logout revocation, retention sweep.
+
+**Integration tests** (live): auth enforcement tests verify that all 6 subdomains correctly grant/deny access based on JWT `projects` claims.
 
 ```bash
 # Per-service JWT keys after Task #2 — one env var per service.

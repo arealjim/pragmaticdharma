@@ -165,6 +165,22 @@ async function runRetentionSweep(env) {
     "DELETE FROM verify_failures WHERE first_at < strftime('%s', 'now', '-1 day')"
   ).run();
   console.log(`[retention] purged ${vf.meta?.changes || 0} verify_failures rows`);
+
+  // Gap 2 follow-through (pd-auth-delta): purge expired auth rows daily, like
+  // psyche does. Dead rows are pure liability — and pre-hash-at-rest rows
+  // (raw tokens) age out of D1 this way too. Magic links live 15 minutes;
+  // a 1-day grace keeps a debugging window. Sessions get 7 days past expiry.
+  // created_at uses datetime('now') format; expires_at is ISO-8601 with 'T',
+  // so each comparison matches its column's own format.
+  const ml = await env.DB.prepare(
+    "DELETE FROM magic_links WHERE created_at < datetime('now', '-1 day')"
+  ).run();
+  console.log(`[retention] purged ${ml.meta?.changes || 0} expired magic_links rows`);
+
+  const sess = await env.DB.prepare(
+    "DELETE FROM sessions WHERE expires_at < strftime('%Y-%m-%dT%H:%M:%S', 'now', '-7 days')"
+  ).run();
+  console.log(`[retention] purged ${sess.meta?.changes || 0} expired sessions rows`);
 }
 
 export default {

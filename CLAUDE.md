@@ -2,6 +2,8 @@
 
 > **Facts** · runs-on: Cloudflare edge · deploys-to: pragmaticdharma.org · depends-on: none (it's the hub; subprojects depend on it) · map: `machine-setup/docs/portfolio-map.md`
 
+> **Role** · app developer (platform hub — auth + shared infra for all pd subprojects) · **Autonomy:** build/test/deploy autonomously; unreviewed proposals queue in `cto/REVIEW.md` first · **Always Jim's:** auth/access-control semantics (user approvals, allowlists, JWT/session policy, `./pd` admin actions) and user-facing announcements/emails · **Cadence:** on demand
+
 Platform portal and auth system for pragmaticdharma.org. Serves the landing page, handles user signup/login (magic link via Resend), admin approval workflow, and provides shared JWT auth for sub-projects.
 
 ## Quick Reference

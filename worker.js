@@ -492,8 +492,16 @@ async function handleVerifyLink(token, request, env) {
     return redirectWithError('Link expired');
   }
 
-  // Mark used
-  await env.DB.prepare('UPDATE magic_links SET used_at = datetime(\'now\') WHERE token = ?').bind(token).run();
+  // Gap 3 (pd-auth-delta): atomic single-use claim. The SELECT above is
+  // advisory only — two concurrent clicks could both pass it. The UPDATE's
+  // `used_at IS NULL` guard is the real gate: exactly one request flips the
+  // row, everyone else sees changes === 0 and is turned away.
+  const claim = await env.DB.prepare(
+    'UPDATE magic_links SET used_at = datetime(\'now\') WHERE token = ? AND used_at IS NULL'
+  ).bind(link.token).run();
+  if (!claim.meta || claim.meta.changes !== 1) {
+    return redirectWithError('Link expired or already used');
+  }
 
   // Read redirect from query param
   const url = new URL(request.url);
@@ -594,8 +602,14 @@ async function handleVerifyCode(request, env) {
   // Success: clear any failure record for this email
   await clearVerifyFailures(env, email);
 
-  // Mark used
-  await env.DB.prepare('UPDATE magic_links SET used_at = datetime(\'now\') WHERE token = ?').bind(link.token).run();
+  // Gap 3 (pd-auth-delta): atomic single-use claim — same race as the link
+  // path. Only the request whose UPDATE actually flips used_at proceeds.
+  const claim = await env.DB.prepare(
+    'UPDATE magic_links SET used_at = datetime(\'now\') WHERE token = ? AND used_at IS NULL'
+  ).bind(link.token).run();
+  if (!claim.meta || claim.meta.changes !== 1) {
+    return jsonResponse({ error: 'Invalid or expired code' }, 401);
+  }
 
   // Create session + JWT
   const user = await env.DB.prepare('SELECT id, email, name, role FROM users WHERE id = ?').bind(link.user_id).first();

@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
+    "test": "node --import ./test/register-stubs.mjs --test 'test/*.test.mjs'",
     "db:migrate": "wrangler d1 execute pragmaticdharma --remote --file schema.sql"
   },
   "devDependencies": {

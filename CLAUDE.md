@@ -6,6 +6,8 @@
 
 Platform portal and auth system for pragmaticdharma.org. Serves the landing page, handles user signup/login (magic link via Resend), admin approval workflow, and provides shared JWT auth for sub-projects.
 
+Deep reference: `docs/ARCHITECTURE.md` (operator manual — component map, login + JWT-verification sequence diagrams, D1 retention schedule, what breaks if the Worker is down).
+
 ## Quick Reference
 
 ```bash
@@ -26,20 +28,10 @@ npm run db:migrate       # Apply schema.sql to remote D1
 
 - **Cloudflare Worker** at `pragmaticdharma.org` — static pages + auth API + admin API
 - **D1 database** (`pragmaticdharma`) — users, magic_links, sessions, access_logs, config
-- **JWT cookies** on `.pragmaticdharma.org` — shared across all sub-project Workers
-- Sub-projects validate JWTs locally using the shared `JWT_SECRET`
+- **JWT cookies** (`pd_session`) on `.pragmaticdharma.org` — each sub-project verifies locally against its own per-service `JWT_SECRET_<SERVICE>` (no callback to this Worker per request)
+- Admin/access changes take effect immediately via `GET /api/refresh-session`, which re-reads `user_projects` from D1 and re-issues the JWT
 
-## Auth Flow
-
-1. User signs up (`POST /api/signup`) — inserted as `pending` (or auto-approved if open_beta)
-2. Admin approves via `./pd approve EMAIL` or `POST /api/admin/approve`
-3. User logs in (`POST /api/login`) — Resend sends email with 6-digit code + magic link
-4. User verifies via code (`POST /api/verify`) or clicks link (`GET /api/verify/:token`)
-5. JWT cookie set on `.pragmaticdharma.org`, 30-day expiry
-
-### Session refresh
-
-Project access changes (via admin dashboard or `user-projects` API) take effect immediately thanks to the `GET /api/refresh-session` endpoint. When a sub-project middleware detects a valid JWT that lacks the required project, it redirects to this endpoint, which re-reads projects from D1 and re-issues the JWT — transparent to the user.
+Full login sequence, JWT-verification sequence, D1 retention schedule, and failure-mode analysis: `docs/ARCHITECTURE.md`.
 
 ## Sub-Projects
 

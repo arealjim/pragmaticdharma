@@ -2,7 +2,28 @@
 
 ## Now
 - [ ] Commit the untracked v2 design docs + push (platform's plan of record lives in one working tree); document the `review` service in the service table and secrets list (review-pass 2026-07-17 web#5, approved by Jim 2026-07-16)
+  Resume: Read ~/workspace/pragmaticdharma/CLAUDE.md and CONTINUE.md. Do ONLY the
+  documentation half of this item: add the `review` service (review.pragmaticdharma.org —
+  worker `review-workers`, D1 `review-db`, Secrets Store entries JWT_SECRET_REVIEW +
+  INGEST_TOKEN_REVIEW; corroborate details in ~/workspace/cto/REVIEW.md and this repo's own
+  docs/config) to this repo's service table and secrets list wherever they live (CLAUDE.md
+  and/or docs/). Do NOT attempt the "commit the untracked v2 design docs" half — those
+  untracked files exist only on framework's checkout, not on this machine; leave that half
+  noted as remaining. Docs-only diff: no code, no wrangler commands, no deploys, no secrets
+  values. This checkout may carry unrelated uncommitted modifications (e.g. pages/login.html)
+  — leave them exactly as they are and `git add` only the files you edited. Update TODO.md
+  (mark the doc half done) and CONTINUE.md, commit and push (git push origin main).
 - [ ] Rewrite-or-demote docs/ai-development-guide.md (single-JWT claim, devbox references, wrong service counts); stop routing live tracking through the frozen 04-25 remediation snapshot (review-pass 2026-07-17 web#8, approved by Jim 2026-07-16)
+  Resume: Read ~/workspace/pragmaticdharma/CLAUDE.md and CONTINUE.md. Fix
+  docs/ai-development-guide.md: correct the single-JWT claim to the current per-project-JWT
+  reality (verify against CLAUDE.md and the code, don't guess), replace devbox references with
+  biggie (devbox is retired), fix the wrong service counts, and either rewrite it accurately or
+  demote it with a clear "HISTORICAL — superseded, see CLAUDE.md" banner. Then stop routing
+  live tracking through the frozen reviews/remediation-status-2026-04-25.md snapshot: move any
+  still-open items it tracks into this TODO.md ## Later and mark the snapshot file frozen/
+  historical at its top. Docs-only diff: no code changes, no deploys, no secrets. This checkout
+  may carry unrelated uncommitted modifications — leave them untouched; `git add` only files
+  you edited. Update TODO.md/CONTINUE.md, commit and push (git push origin main).
 
 ## Later
 - [ ] Restore per-project JWT signing-key independence for sentinel: create `JWT_SECRET_SENTINEL` via the Cloudflare dashboard, then flip `KID_TO_BINDING['sentinel']` in this repo and `secret_name` in `~/workspace/sentinel-web/wrangler.toml` together (see CLAUDE.md, "Sentinel temporary signing-key state", open since 2026-05-25)

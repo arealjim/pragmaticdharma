@@ -1,18 +1,9 @@
 # TODO
 
 ## Now
-- [ ] Commit the untracked v2 design docs + push (platform's plan of record lives in one working tree); document the `review` service in the service table and secrets list (review-pass 2026-07-17 web#5, approved by Jim 2026-07-16)
-  Resume: Read ~/workspace/pragmaticdharma/CLAUDE.md and CONTINUE.md. Do ONLY the
-  documentation half of this item: add the `review` service (review.pragmaticdharma.org —
-  worker `review-workers`, D1 `review-db`, Secrets Store entries JWT_SECRET_REVIEW +
-  INGEST_TOKEN_REVIEW; corroborate details in ~/workspace/cto/REVIEW.md and this repo's own
-  docs/config) to this repo's service table and secrets list wherever they live (CLAUDE.md
-  and/or docs/). Do NOT attempt the "commit the untracked v2 design docs" half — those
-  untracked files exist only on framework's checkout, not on this machine; leave that half
-  noted as remaining. Docs-only diff: no code, no wrangler commands, no deploys, no secrets
-  values. This checkout may carry unrelated uncommitted modifications (e.g. pages/login.html)
-  — leave them exactly as they are and `git add` only the files you edited. Update TODO.md
-  (mark the doc half done) and CONTINUE.md, commit and push (git push origin main).
+- [ ] Commit the untracked v2 design docs + push (platform's plan of record lives in one working tree) — docs/v2-registry-schema.md and prompts/v2-registry-rewrite.md exist only on framework's checkout; not present on biggie (review-pass 2026-07-17 web#5, approved by Jim 2026-07-16)
+  Resume: On framework, `git add docs/v2-registry-schema.md prompts/v2-registry-rewrite.md && git commit -m "chore: track v2 design artifacts" && git push origin main`.
+- [x] Document the `review` service in the service table and secrets list (review-pass 2026-07-17 web#5, approved by Jim 2026-07-16) — DONE 2026-07-19: added review.pragmaticdharma.org row to Sub-Projects table and JWT_SECRET_REVIEW + INGEST_TOKEN_REVIEW to Secrets section in CLAUDE.md
 - [ ] Rewrite-or-demote docs/ai-development-guide.md (single-JWT claim, devbox references, wrong service counts); stop routing live tracking through the frozen 04-25 remediation snapshot (review-pass 2026-07-17 web#8, approved by Jim 2026-07-16)
   Resume: Read ~/workspace/pragmaticdharma/CLAUDE.md and CONTINUE.md. Fix
   docs/ai-development-guide.md: correct the single-JWT claim to the current per-project-JWT

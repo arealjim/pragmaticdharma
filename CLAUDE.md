@@ -35,7 +35,7 @@ Full login sequence, JWT-verification sequence, D1 retention schedule, and failu
 
 ## Sub-Projects
 
-All 10 sub-projects are Cloudflare Workers (Pages migration complete 2026-04-25; discern added 2026-06-12). Each verifies JWTs with its own per-service key (Task #2 — `kid` claim selects the right key).
+All 11 sub-projects are Cloudflare Workers (Pages migration complete 2026-04-25; discern added 2026-06-12; review added 2026-07-17). Each verifies JWTs with its own per-service key (`kid` claim selects the right key).
 
 | Subdomain | Worker | Auth Style | Notes |
 |-----------|--------|------------|-------|
@@ -49,6 +49,7 @@ All 10 sub-projects are Cloudflare Workers (Pages migration complete 2026-04-25;
 | health.pragmaticdharma.org | `tcm-tracker` (Flask via cloudflared) | api-gate (401) | Health tracking on biggie |
 | bromnichord.pragmaticdharma.org | `bromnichord-workers` | worker-gate (302/403) | Chiptune omnichord instrument; static assets only |
 | discern.pragmaticdharma.org | `discern-workers` | worker-gate (302/403) | Calibration training game (~/workspace/discern); static assets only, localStorage data |
+| review.pragmaticdharma.org | `review-workers` | worker-gate (302/403) | Business-ops review dashboard (majordomo project); own D1 `review-db`; `/api/ingest` accepts bearer `INGEST_TOKEN_REVIEW` from odf-application-pipeline |
 
 The legacy magic-link auth (ego_session) was retired. Subdomain `ego-assessment.pages.dev` is going away once the old Pages project is deleted.
 
@@ -59,9 +60,12 @@ The legacy magic-link auth (ego_session) was retired. Subdomain `ego-assessment.
 All platform secrets live in **Cloudflare Secrets Store** under store name `pragmaticdharma` (id `626a023faf5e4be98729d2f4b9849f09`). Each service binds only its own keys; the platform Worker holds all of them so it can sign JWTs for any destination.
 
 **Per-service JWT signing keys** (one per service, named `JWT_SECRET_<SERVICE>`):
-- `JWT_SECRET_PRAGMATICDHARMA`, `JWT_SECRET_EGO_ASSESSMENT`, `JWT_SECRET_SHIELD`, `JWT_SECRET_MINDREADER`, `JWT_SECRET_PSYCHTOOLS`, `JWT_SECRET_ASTROLOGY`, `JWT_SECRET_PRACTICE`, `JWT_SECRET_HEALTH`, `JWT_SECRET_BROMNICHORD`, `JWT_SECRET_DISCERN`
+- `JWT_SECRET_PRAGMATICDHARMA`, `JWT_SECRET_EGO_ASSESSMENT`, `JWT_SECRET_SHIELD`, `JWT_SECRET_MINDREADER`, `JWT_SECRET_PSYCHTOOLS`, `JWT_SECRET_ASTROLOGY`, `JWT_SECRET_PRACTICE`, `JWT_SECRET_HEALTH`, `JWT_SECRET_BROMNICHORD`, `JWT_SECRET_DISCERN`, `JWT_SECRET_REVIEW`
 - `JWT_SECRET_DISCERN` (created 2026-06-12) has its own random value — the beta secrets-store CLI now works with `--remote`, so the sentinel workaround wasn't needed.
 - The platform Worker sets `kid: <service>` in the JWT header so each verifier picks the right key.
+
+**Per-service ingest tokens** (bearer auth for machine-to-machine ingest, held by the receiving worker — not the platform hub):
+- `INGEST_TOKEN_REVIEW` — held by `review-workers`; presented by odf-application-pipeline when pushing decisions to `/api/ingest`.
 
 **Other shared secrets:** `OWNER_EMAIL`.
 

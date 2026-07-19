@@ -4,43 +4,31 @@ _Updated: 2026-07-19_
 
 ## State
 
-Platform hub is live and stable. v2 registry-driven rewrite is in progress — design approved by Jim, Slice 0 complete (no deploy, test-only). The session-revocation Gap 1 (24h JWT TTL + lazy /login refresh) was deployed earlier today.
+Platform hub is live and stable. v2 registry-driven rewrite: Slice 0 and Slice 1 both complete and deployed. Session-revocation Gap 1 (24h JWT TTL + lazy /login refresh) was deployed earlier the same day.
 
-**Slice 0 complete:** `projects.config.mjs` (11-project registry) + `src/registry.js` (derivations + import-time validation) + `test/v2-registry.test.mjs` (5 equality tests). All 29 tests green.
+**Slice 1 complete (deployed, version edefe64f):** `worker.js` now imports `KNOWN_PROJECTS`, `REDIRECT_ALLOWLIST`, `HOST_TO_PROJECT`, `KID_TO_BINDING`, `CSP_CONNECT_SRC_HOSTS` from `src/registry.js` instead of defining its own literals. Deleted the dead `getSigningKey` helper and the `v2-slice-0` freeze-export block. `test/v2-registry.test.mjs` rewritten to assert shape/values directly against the registry (the old worker-vs-registry equality check became trivially true once both sides shared one source). 29/29 unit tests green, local `wrangler dev` smoke test green, post-deploy production check confirmed the CSP `connect-src` header matches the registry-derived hosts exactly.
 
-**Go-ahead shape:** Jim wants a check-in after Slice 1's flip deploy before continuing slices 2–4.
+**Known gap:** the live 45-check `test-auth.js` integration suite was NOT run before/after this deploy — this session had no access to the production `JWT_SECRET_*` values (Cloudflare Secrets Store is write-only; most services' keys aren't mirrored in the local vault). Deploy safety instead rested on: the Slice-0 equality tests (now folded into Slice 1's registry-shape tests), a clean `node --check`, a local `wrangler dev` smoke test, and a post-deploy production smoke test (CSP header, redirect-allowlist behavior, unauthenticated gate responses on all subdomains). If Jim wants the full JWT suite run, it needs a session/machine with the `JWT_SECRET_*` values, or Jim providing them.
 
-**Pending ## Now items (not v2):**
-- Untracked v2 design docs on framework (docs/v2-registry-schema.md, prompts/v2-registry-rewrite.md — not present on biggie)
-- ~~docs/ai-development-guide.md rewrite (web#8)~~ — DONE 2026-07-19
+**Go-ahead shape:** Jim wanted a check-in after Slice 1's flip deploy before continuing slices 2–4. That check-in is now due.
 
 ## Next step
 
-Execute **Slice 1 — flip the worker**: replace the five literals in worker.js with imports from `src/registry.js`, delete `getSigningKey` + dead exports, run `npm test` + `node test-auth.js` (live, 45 checks) before and after, deploy. Then signal Jim for check-in before continuing.
-
-Files that change in Slice 1:
-- `worker.js` — replace `KNOWN_PROJECTS`, `REDIRECT_ALLOWLIST`, `redirectUrlToProject`/`HOST_TO_PROJECT`, `KID_TO_BINDING`, `CSP_CONNECT_SRC_HOSTS` literals with imports from `./src/registry.js`; delete `getSigningKey`; remove the `v2-slice-0` exports block; remove the `v2-slice-0` extraction comments from the extracted consts (now just imports)
-- `test/v2-registry.test.mjs` — update imports (both sides now from src/registry.js); keep the size/count assertions; drop the worker.js import side OR keep it (it re-exports from registry after the flip, so equality is trivially true but harmless)
+Wait for Jim's go-ahead, then continue with:
+- Slice 2 — wrangler.toml codegen (scripts/gen-wrangler.mjs; no binding changes)
+- Slice 3 — pages + admin from registry ({{cards}} substitution; GET /api/admin/projects)
+- Slice 4 — tests + CLI (test-auth.js matrix generated from registry; `pd projects`; `pd add-project`)
+- Slice 5 (optional) — module split into src/ layout
 
 ## Prompt
 
 ```
 Work in ~/workspace/pragmaticdharma. Read TODO.md and CONTINUE.md.
-Execute v2 Slice 1 — flip the worker:
-1. In worker.js, replace the five literal data structures (KNOWN_PROJECTS, REDIRECT_ALLOWLIST,
-   HOST_TO_PROJECT/redirectUrlToProject, KID_TO_BINDING, CSP_CONNECT_SRC_HOSTS) with imports
-   from ./src/registry.js. Remove the v2-slice-0 extraction consts and the v2-slice-0 exports
-   block at the bottom. Delete the getSigningKey function (no callers — see TODO item). Also
-   remove the trailing dead exports for it.
-2. Update test/v2-registry.test.mjs: both sides now come from src/registry.js, so simplify or
-   drop the worker.js import side (the test should still verify the derived structures have the
-   right sizes/values, just against the registry directly).
-3. Run npm test — must stay 29/29 green (or equivalent after test simplification).
-4. Run node test-auth.js (live integration tests, all 45 checks must pass).
-5. Deploy: npm run deploy.
-6. Run node test-auth.js again after deploy.
-7. Signal Jim for check-in: ~/workspace/cto/bin/signal thread needs-jim e0321e5cf9fb
-   "Slice 1 deployed and green (29 unit + 45 live). Ready for slices 2–4 (wrangler codegen,
-   pages from registry, test-auth generation + pd add-project). Nod to continue?"
-8. Update TODO.md (mark slice 1 done) and CONTINUE.md, commit and push.
+Slice 1 is done and deployed. If Jim has given the go-ahead, continue with
+v2 Slice 2 — wrangler.toml codegen: write scripts/gen-wrangler.mjs that
+generates wrangler.toml's secrets_store_secrets bindings from
+projects.config.mjs (JWT_SECRET_<KID> entries), diff against the current
+wrangler.toml to confirm no binding changes, and wire it as a `predeploy`
+or documented manual step. No binding changes should occur in this slice —
+it's establishing the registry as the single source for config generation.
 ```

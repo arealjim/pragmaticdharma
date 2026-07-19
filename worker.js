@@ -34,28 +34,13 @@ import NAV_BAR_HTML from './shared/nav-bar.html';
 // loader also claiming it.
 import PD_SSO_CLIENT from './shared/pd-sso.txt';
 
-const KNOWN_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice', 'sentinel', 'bromnichord', 'discern', 'review'];
-
-// H6: explicit allowlist of redirect destinations. Previously the regex
-// allowed any *.pragmaticdharma.org subdomain — a dangling DNS / takeover
-// of an unused subdomain would have been a cheap pivot to phish auth
-// tokens via the post-login redirect. Anchor on the actual platform
-// subdomains we use.
-const REDIRECT_ALLOWLIST = new Set([
-  'pragmaticdharma.org',
-  'retreats.pragmaticdharma.org',
-  'health.pragmaticdharma.org',
-  'sentinel.pragmaticdharma.org',
-  'shield.pragmaticdharma.org',
-  'psychology.pragmaticdharma.org',
-  'mindreader.pragmaticdharma.org',
-  'psychtools.pragmaticdharma.org',
-  'astrology.pragmaticdharma.org',
-  'practice.pragmaticdharma.org',
-  'bromnichord.pragmaticdharma.org',
-  'discern.pragmaticdharma.org',
-  'review.pragmaticdharma.org',
-]);
+import {
+  KNOWN_PROJECTS,
+  REDIRECT_ALLOWLIST,
+  HOST_TO_PROJECT,
+  KID_TO_BINDING,
+  CSP_CONNECT_SRC_HOSTS,
+} from './src/registry.js';
 
 function validateRedirectUrl(url) {
   if (!url || typeof url !== 'string') return '';
@@ -67,23 +52,6 @@ function validateRedirectUrl(url) {
   return url;
 }
 
-// v2-slice-0: extracted from inside redirectUrlToProject so the freeze test
-// can import and equality-check it against the registry derivation. Removed
-// in slice 1 when the worker imports HOST_TO_PROJECT from src/registry.js.
-const HOST_TO_PROJECT = {
-  'health.pragmaticdharma.org': 'health',
-  'sentinel.pragmaticdharma.org': 'sentinel',
-  'shield.pragmaticdharma.org': 'shield',
-  'psychology.pragmaticdharma.org': 'ego-assessment',
-  'mindreader.pragmaticdharma.org': 'mindreader',
-  'psychtools.pragmaticdharma.org': 'psychtools',
-  'astrology.pragmaticdharma.org': 'astrology',
-  'practice.pragmaticdharma.org': 'practice',
-  'bromnichord.pragmaticdharma.org': 'bromnichord',
-  'discern.pragmaticdharma.org': 'discern',
-  'review.pragmaticdharma.org': 'review',
-};
-
 function redirectUrlToProject(url) {
   try {
     const host = new URL(url).hostname;
@@ -92,14 +60,6 @@ function redirectUrlToProject(url) {
     return null;
   }
 }
-
-// v2-slice-0: extracted so the freeze test can equality-check these against
-// the registry-derived CSP_CONNECT_SRC_HOSTS. Removed in slice 1 when the
-// worker imports CSP_CONNECT_SRC_HOSTS from src/registry.js.
-const CSP_CONNECT_SRC_HOSTS = [
-  'https://health.pragmaticdharma.org',
-  'https://psychology.pragmaticdharma.org',
-];
 
 // M2: baseline CSP for the platform Worker. script-src/style-src allow
 // 'unsafe-inline' because admin.html and login.html have inline scripts;
@@ -1003,32 +963,6 @@ async function handleAdmin(request, env, path, method) {
 // platform-wide takeover (the goal of Task #2).
 // =========================================================================
 
-const KID_TO_BINDING = {
-  'pragmaticdharma':  'JWT_SECRET_PRAGMATICDHARMA',
-  'ego-assessment':   'JWT_SECRET_EGO_ASSESSMENT',
-  'shield':           'JWT_SECRET_SHIELD',
-  'mindreader':       'JWT_SECRET_MINDREADER',
-  'psychtools':       'JWT_SECRET_PSYCHTOOLS',
-  'astrology':        'JWT_SECRET_ASTROLOGY',
-  'practice':         'JWT_SECRET_PRACTICE',
-  // tcm-tracker (health) — has its own per-service key in the Store and on
-  // /etc/tcm-tracker/env. Rotated 2026-04-25 (Task #20).
-  'health':           'JWT_SECRET_HEALTH',
-  // sentinel (Phase 3, 2026-05-25) — temporarily reuses JWT_SECRET_PRAGMATICDHARMA
-  // because the per-project JWT_SECRET_SENTINEL entry could not be created via
-  // the beta secrets-store CLI (and keepass DB password was not immediately
-  // available to recreate via dashboard). Same key VALUE either way — the
-  // canonical JWT signing secret is shared across all platform projects today
-  // (per-binding rotation is what's being deferred, not key separation in
-  // value). When JWT_SECRET_SENTINEL exists in the Secrets Store, flip this
-  // line to 'JWT_SECRET_SENTINEL' and update sentinel-web/wrangler.toml in
-  // the same change.
-  'sentinel':         'JWT_SECRET_PRAGMATICDHARMA',
-  'bromnichord':      'JWT_SECRET_BROMNICHORD',
-  'discern':          'JWT_SECRET_DISCERN',
-  'review':           'JWT_SECRET_REVIEW',
-};
-
 async function getSigningKeyForKid(env, kid) {
   const bindingName = KID_TO_BINDING[kid];
   if (!bindingName) return null;
@@ -1150,19 +1084,6 @@ async function verifyJWTForRefresh(env, token) {
 // redirect or the host isn't recognized — those JWTs are platform-internal.
 function kidForRedirect(redirect) {
   return redirectUrlToProject(redirect) || 'pragmaticdharma';
-}
-
-async function getSigningKey(env) {
-  // Legacy helper retained only for callers that still expect a single key.
-  // Prefer getSigningKeyForKid + signJWT(env, payload, kid).
-  const secret = await getSecret(env, 'JWT_SECRET_PRAGMATICDHARMA');
-  return crypto.subtle.importKey(
-    'raw',
-    new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign', 'verify']
-  );
 }
 
 function base64url(input) {
@@ -1485,8 +1406,3 @@ function redirectWithError(msg) {
 
 // Export for use by sub-project workers and unit tests
 export { verifyJWT, verifyJWTForRefresh, getJWTFromCookie, signJWT, accessEmbed, formatLocation, notifyDiscord };
-
-// v2-slice-0 freeze exports: equality-tested by test/v2-registry.test.mjs against
-// the registry-derived equivalents. Both sides removed in slice 1 when the worker
-// imports these from src/registry.js instead of defining them as literals.
-export { KNOWN_PROJECTS, REDIRECT_ALLOWLIST, KID_TO_BINDING, HOST_TO_PROJECT, CSP_CONNECT_SRC_HOSTS };

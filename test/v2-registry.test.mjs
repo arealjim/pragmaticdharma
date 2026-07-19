@@ -1,22 +1,10 @@
-// Slice-0 freeze tests: each registry-derived structure must deep-equal the
-// corresponding live literal in worker.js. These tests stay green through slice 1
-// (when worker.js imports from the registry), at which point both sides share the
-// same source and the test confirms the import wiring is correct. Removed in
-// slice 1 along with the v2-slice-0 exports from worker.js.
+// Registry derivation tests. worker.js imports these structures directly from
+// src/registry.js (as of slice 1) rather than defining its own literals, so
+// these assert shape/size against the registry itself.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-// Live literals from worker.js (v2-slice-0 freeze exports)
-import {
-  KNOWN_PROJECTS as workerKnownProjects,
-  REDIRECT_ALLOWLIST as workerRedirectAllowlist,
-  KID_TO_BINDING as workerKidToBinding,
-  HOST_TO_PROJECT as workerHostToProject,
-  CSP_CONNECT_SRC_HOSTS as workerCspConnectSrcHosts,
-} from '../worker.js';
-
-// Registry-derived equivalents
 import {
   KNOWN_PROJECTS,
   REDIRECT_ALLOWLIST,
@@ -25,26 +13,36 @@ import {
   CSP_CONNECT_SRC_HOSTS,
 } from '../src/registry.js';
 
-test('KNOWN_PROJECTS from registry matches worker literal', () => {
-  assert.deepStrictEqual(KNOWN_PROJECTS, workerKnownProjects);
+test('KNOWN_PROJECTS has one entry per project', () => {
+  assert.equal(KNOWN_PROJECTS.length, 11, 'expected 11 project keys');
+  assert.deepStrictEqual(KNOWN_PROJECTS, [
+    'health', 'shield', 'ego-assessment', 'mindreader', 'psychtools',
+    'astrology', 'practice', 'sentinel', 'bromnichord', 'discern', 'review',
+  ]);
 });
 
-test('REDIRECT_ALLOWLIST from registry matches worker literal (13 hosts)', () => {
+test('REDIRECT_ALLOWLIST has 13 hosts (11 projects + apex + retreats)', () => {
   assert.equal(REDIRECT_ALLOWLIST.size, 13, 'allowlist must have exactly 13 hosts');
-  assert.deepStrictEqual(REDIRECT_ALLOWLIST, workerRedirectAllowlist);
+  assert.ok(REDIRECT_ALLOWLIST.has('pragmaticdharma.org'));
+  assert.ok(REDIRECT_ALLOWLIST.has('retreats.pragmaticdharma.org'));
+  assert.ok(REDIRECT_ALLOWLIST.has('psychology.pragmaticdharma.org'));
 });
 
-test('HOST_TO_PROJECT from registry matches worker literal (11 entries)', () => {
+test('HOST_TO_PROJECT has 11 entries and maps psychology.* to ego-assessment', () => {
   assert.equal(Object.keys(HOST_TO_PROJECT).length, 11, 'host map must have exactly 11 entries');
-  assert.deepStrictEqual(HOST_TO_PROJECT, workerHostToProject);
+  assert.equal(HOST_TO_PROJECT['psychology.pragmaticdharma.org'], 'ego-assessment');
 });
 
-test('KID_TO_BINDING from registry matches worker literal (12 entries: 11 projects + platform)', () => {
+test('KID_TO_BINDING has 12 entries (11 projects + platform) and honors sentinel override', () => {
   assert.equal(Object.keys(KID_TO_BINDING).length, 12, 'kid map must have 12 entries');
-  assert.deepStrictEqual(KID_TO_BINDING, workerKidToBinding);
+  assert.equal(KID_TO_BINDING['pragmaticdharma'], 'JWT_SECRET_PRAGMATICDHARMA');
+  assert.equal(KID_TO_BINDING['sentinel'], 'JWT_SECRET_PRAGMATICDHARMA');
+  assert.equal(KID_TO_BINDING['review'], 'JWT_SECRET_REVIEW');
 });
 
-test('CSP_CONNECT_SRC_HOSTS from registry matches worker literal (health + psychology)', () => {
-  assert.equal(CSP_CONNECT_SRC_HOSTS.length, 2, 'exactly 2 adminConnect projects');
-  assert.deepStrictEqual(CSP_CONNECT_SRC_HOSTS, workerCspConnectSrcHosts);
+test('CSP_CONNECT_SRC_HOSTS has exactly the 2 adminConnect projects (health + psychology)', () => {
+  assert.deepStrictEqual(CSP_CONNECT_SRC_HOSTS, [
+    'https://health.pragmaticdharma.org',
+    'https://psychology.pragmaticdharma.org',
+  ]);
 });

@@ -1,8 +1,7 @@
 # TODO
 
 ## Now
-- [ ] Commit the untracked v2 design docs + push (platform's plan of record lives in one working tree) — docs/v2-registry-schema.md and prompts/v2-registry-rewrite.md exist only on framework's checkout; not present on biggie (review-pass 2026-07-17 web#5, approved by Jim 2026-07-16)
-  Resume: On framework, `git add docs/v2-registry-schema.md prompts/v2-registry-rewrite.md && git commit -m "chore: track v2 design artifacts" && git push origin main`.
+- [x] Commit the untracked v2 design docs + push (platform's plan of record lives in one working tree) — DONE 2026-07-19: docs/v2-registry-schema.md and prompts/v2-registry-rewrite.md committed and pushed (c2c9f97)
 - [x] Document the `review` service in the service table and secrets list (review-pass 2026-07-17 web#5, approved by Jim 2026-07-16) — DONE 2026-07-19: added review.pragmaticdharma.org row to Sub-Projects table and JWT_SECRET_REVIEW + INGEST_TOKEN_REVIEW to Secrets section in CLAUDE.md
 - [x] Rewrite-or-demote docs/ai-development-guide.md (single-JWT claim, devbox references, wrong service counts); stop routing live tracking through the frozen 04-25 remediation snapshot — DONE 2026-07-19: guide rewritten (12 workers, per-project JWT key facts corrected, devbox→biggie); deferred items migrated to TODO.md ## Later; snapshot frozen with historical banner.
 
@@ -14,9 +13,9 @@
 - [ ] ego-development M-new-3: server-side session-completion check — needs schema-aware response-count check + expected-stem-count source-of-truth (Phase 1 deferred; prompt: `~/prompts/ego-m-new-3-session-completion.md`)
 - [ ] ego-development M-new-8: delete-request feedback table — needs schema migration + admin UI updates (Phase 1 deferred; prompt: `~/prompts/ego-m-new-8-delete-request-feedback.md`)
 - [ ] mind-reader: review Polar H10 + HRV WIP — unrelated WIP from prior session, needs human review before commit (Phase 1 deferred; prompt: `~/prompts/mind-reader-polar-h10-review.md`)
-- [ ] v2 registry-driven rewrite — design approved 2026-07-19 (docs/design-v2-registry.md); check-in after slice 1. **Slice 0 in progress:**
+- [ ] v2 registry-driven rewrite — design approved 2026-07-19 (docs/design-v2-registry.md); check-in after slice 1, before continuing to slices 2-4. **Slice 1 done, awaiting Jim's go-ahead:**
   - [x] Slice 0 — freeze: projects.config.mjs + src/registry.js + test/v2-registry.test.mjs (equality tests green; no deploy)
-  - [ ] Slice 1 — flip: replace 5 literals in worker.js with registry imports; delete getSigningKey + dead exports; npm test + test-auth.js green before and after; DEPLOY — then check in with Jim
+  - [x] Slice 1 — flip: worker.js now imports KNOWN_PROJECTS/REDIRECT_ALLOWLIST/HOST_TO_PROJECT/KID_TO_BINDING/CSP_CONNECT_SRC_HOSTS from src/registry.js; deleted dead getSigningKey + v2-slice-0 freeze exports; test/v2-registry.test.mjs rewritten to assert against the registry directly (both sides now share one source, so the old worker-vs-registry equality check was trivially true). DONE 2026-07-19: 29/29 unit tests green, local wrangler dev smoke test green, deployed (version edefe64f), post-deploy CSP connect-src header verified live matches registry-derived hosts. **Live 45-check test-auth.js NOT run** — this session had no access to the production JWT_SECRET_* values (Secrets Store is write-only; no local vault copies for most services). Deploy safety instead rested on the exhaustive equality tests, a clean node --check, and local+prod smoke tests.
   - [ ] Slice 2 — wrangler.toml codegen (scripts/gen-wrangler.mjs; no binding changes)
   - [ ] Slice 3 — pages + admin from registry ({{cards}} substitution; GET /api/admin/projects)
   - [ ] Slice 4 — tests + CLI (test-auth.js matrix from registry; pd projects; pd add-project)

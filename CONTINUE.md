@@ -12,7 +12,7 @@ Platform hub is live and stable. v2 registry-driven rewrite is in progress — d
 
 **Pending ## Now items (not v2):**
 - Untracked v2 design docs on framework (docs/v2-registry-schema.md, prompts/v2-registry-rewrite.md — not present on biggie)
-- docs/ai-development-guide.md rewrite (web#8)
+- ~~docs/ai-development-guide.md rewrite (web#8)~~ — DONE 2026-07-19
 
 ## Next step
 

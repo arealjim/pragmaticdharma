@@ -1,3 +1,5 @@
+> **HISTORICAL SNAPSHOT — frozen 2026-07-19.** This file records the state of Phase 1 remediation as of 2026-04-25. All deferred items have been migrated to `pragmaticdharma/TODO.md ## Later`. Do not update this file — it is an audit record. See `TODO.md` for live tracking.
+
 # Phase 1 Security Audit — Remediation Status
 
 **Audit date:** 2026-04-23

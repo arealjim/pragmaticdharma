@@ -21,8 +21,11 @@ Services and their Worker names:
 | `practice.pragmaticdharma.org` | `practice-workers` | Cycle-aware task management (frontend) |
 | `health.pragmaticdharma.org` | `tcm-tracker` (Flask via cloudflared) | Health tracking |
 | `bromnichord.pragmaticdharma.org` | `bromnichord-workers` | Chiptune omnichord instrument |
+| `discern.pragmaticdharma.org` | `discern-workers` | Calibration training game |
+| `sentinel.pragmaticdharma.org` | `sentinel-web` | Preparedness dashboard (admin-only) |
+| `review.pragmaticdharma.org` | `review-workers` | Business-ops review dashboard |
 
-Two services have devbox-side Node proxies for the Claude CLI (`astrology-api.pragmaticdharma.org`, `practice-api.pragmaticdharma.org`) reachable via cloudflared tunnel. They run as systemd units on devbox.
+Two services have biggie-side Node proxies for the Claude CLI (`astrology-api.pragmaticdharma.org`, `practice-api.pragmaticdharma.org`) reachable via cloudflared tunnel. They run as systemd units on biggie.
 
 ---
 
@@ -30,7 +33,7 @@ Two services have devbox-side Node proxies for the Claude CLI (`astrology-api.pr
 
 ### 2.1 JWT verification
 
-The platform Worker (`pragmaticdharma`) issues JWTs signed with the shared `JWT_SECRET` from the Cloudflare Secrets Store. Sub-services verify the JWT and check that the user's `projects` claim includes their project key.
+The platform Worker (`pragmaticdharma`) issues JWTs signed with a **per-service key** from the Cloudflare Secrets Store (`JWT_SECRET_<SERVICE>`, e.g. `JWT_SECRET_SHIELD`). The JWT header carries a `kid` claim identifying the target service; the platform Worker selects the matching key via `KID_TO_BINDING`. Sub-services hold only their own signing key (bound as `JWT_SECRET` in wrangler.toml, pointing at the per-service store entry) and verify the JWT against it. They also check that the user's `projects` claim includes their project key.
 
 **Don't reimplement JWT verification in each project.** The canonical implementations are at:
 - `pragmaticdharma/shared/auth-cloudflare.js` (Workers / Pages Functions)
@@ -84,8 +87,9 @@ wrangler secrets-store secret list 626a023faf5e4be98729d2f4b9849f09 --remote
 
 ### 3.2 Naming conventions
 
-- **Shared across services** — bare names: `JWT_SECRET`, `OWNER_EMAIL`.
-- **Service-specific** — prefix with the service name: `EGO_ANTHROPIC_API_KEY`, `PSYCHTOOLS_DISCORD_WEBHOOK_URL`, `ASTROLOGY_SHIELD_API_KEY`.
+- **Shared across services** — bare names: `OWNER_EMAIL`.
+- **Per-service JWT signing keys** — `JWT_SECRET_<SERVICE>` (e.g. `JWT_SECRET_SHIELD`, `JWT_SECRET_DISCERN`). The platform Worker holds all of them for signing; each sub-service holds only its own for verification. In the sub-service's wrangler.toml the `binding` name is `JWT_SECRET` — only the `secret_name` differs. There is no single shared `JWT_SECRET`.
+- **Other service-specific secrets** — prefix with the service name: `EGO_ANTHROPIC_API_KEY`, `PSYCHTOOLS_DISCORD_WEBHOOK_URL`, `ASTROLOGY_SHIELD_API_KEY`.
 
 When binding in `wrangler.toml`, the store entry name and the Worker `binding` name don't have to match:
 
@@ -151,7 +155,7 @@ Every endpoint that calls the Anthropic API or `claude` CLI **must** include all
 3. **Per-user rate limit** — sliding hourly window backed by D1 or in-memory `Map`. See `astrology/server/index.js` `checkRateLimit` for the canonical pattern.
 4. **Concurrency cap** — max N concurrent Claude calls in flight per Worker. See `astrology/server/index.js` `MAX_CONCURRENT_CLAUDE`.
 
-For services that shell out to the `claude` CLI subprocess (devbox proxies, `tcm-tracker`):
+For services that shell out to the `claude` CLI subprocess (biggie proxies, `tcm-tracker`):
 
 5. **Sandbox via bubblewrap** — tcm-tracker's `src/sandbox.py` is the reference. Use `--clearenv` + explicit `--setenv` whitelist (HOME, USER, PATH, LANG, LC_ALL, TERM) so a prompt-injected Claude can't read inherited Flask environment via `/proc/self/environ`. Also `--tmpfs` over secret directories like `/etc/<service>/`.
 
@@ -228,7 +232,7 @@ Five Pages projects were migrated in Phase 2. The recipe:
 
    The window between unbind and bind is ~2-3 seconds.
 
-9. **Verify** with `JWT_SECRET=… node ~/workspace/pragmaticdharma/test-auth.js`. Expect 45/45.
+9. **Verify** with per-service env vars (see Testing section in `CLAUDE.md`). Expect 45/45.
 
 10. **Don't delete the old Pages project for 48 hours** — keep it as rollback safety. To roll back: reverse the API calls and re-add the original `ego-assessment.pages.dev` CNAME.
 
@@ -239,7 +243,7 @@ Five Pages projects were migrated in Phase 2. The recipe:
 Before exposing a new service publicly, confirm each item:
 
 ### Authentication
-- [ ] Verifies `pd_session` JWT against `JWT_SECRET` from Secrets Store
+- [ ] Verifies `pd_session` JWT against its own `JWT_SECRET_<SERVICE>` from Secrets Store (bound as `JWT_SECRET` in wrangler.toml; `kid` claim must match)
 - [ ] Checks `projects` claim includes the service key
 - [ ] Has `_middleware.js` (Pages-derived) or `validateSession()` call (api-gate) on every protected route
 - [ ] `compatibility_date >= 2026-04-01` in wrangler.toml
@@ -301,8 +305,8 @@ If you find yourself adding a `body.userId` fallback "for compatibility," stop a
 | Canonical JWT verifier (Python) | `pragmaticdharma/shared/auth-flask.py` |
 | Bubblewrap reference | `tcm-tracker/src/sandbox.py` |
 | Rate-limit + concurrency cap reference | `astrology/server/index.js` |
-| Active task list (this initiative) | `TaskList` in this Claude session |
+| Active task list | `pragmaticdharma/TODO.md` |
 
 ---
 
-*Last updated 2026-04-25 after the platform migration to Workers + Secrets Store.*
+*Last updated 2026-07-19: service table updated (12 workers), JWT per-project key facts corrected, devbox retired → biggie.*

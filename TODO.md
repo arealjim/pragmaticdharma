@@ -4,21 +4,16 @@
 - [ ] Commit the untracked v2 design docs + push (platform's plan of record lives in one working tree) — docs/v2-registry-schema.md and prompts/v2-registry-rewrite.md exist only on framework's checkout; not present on biggie (review-pass 2026-07-17 web#5, approved by Jim 2026-07-16)
   Resume: On framework, `git add docs/v2-registry-schema.md prompts/v2-registry-rewrite.md && git commit -m "chore: track v2 design artifacts" && git push origin main`.
 - [x] Document the `review` service in the service table and secrets list (review-pass 2026-07-17 web#5, approved by Jim 2026-07-16) — DONE 2026-07-19: added review.pragmaticdharma.org row to Sub-Projects table and JWT_SECRET_REVIEW + INGEST_TOKEN_REVIEW to Secrets section in CLAUDE.md
-- [ ] Rewrite-or-demote docs/ai-development-guide.md (single-JWT claim, devbox references, wrong service counts); stop routing live tracking through the frozen 04-25 remediation snapshot (review-pass 2026-07-17 web#8, approved by Jim 2026-07-16)
-  Resume: Read ~/workspace/pragmaticdharma/CLAUDE.md and CONTINUE.md. Fix
-  docs/ai-development-guide.md: correct the single-JWT claim to the current per-project-JWT
-  reality (verify against CLAUDE.md and the code, don't guess), replace devbox references with
-  biggie (devbox is retired), fix the wrong service counts, and either rewrite it accurately or
-  demote it with a clear "HISTORICAL — superseded, see CLAUDE.md" banner. Then stop routing
-  live tracking through the frozen reviews/remediation-status-2026-04-25.md snapshot: move any
-  still-open items it tracks into this TODO.md ## Later and mark the snapshot file frozen/
-  historical at its top. Docs-only diff: no code changes, no deploys, no secrets. This checkout
-  may carry unrelated uncommitted modifications — leave them untouched; `git add` only files
-  you edited. Update TODO.md/CONTINUE.md, commit and push (git push origin main).
+- [x] Rewrite-or-demote docs/ai-development-guide.md (single-JWT claim, devbox references, wrong service counts); stop routing live tracking through the frozen 04-25 remediation snapshot — DONE 2026-07-19: guide rewritten (12 workers, per-project JWT key facts corrected, devbox→biggie); deferred items migrated to TODO.md ## Later; snapshot frozen with historical banner.
 
 ## Later
 - [ ] Restore per-project JWT signing-key independence for sentinel — **needs Jim at the Cloudflare dashboard** (Jim approved 2026-07-19): (1) log into Cloudflare dashboard → Secrets Store `pragmaticdharma` → create `JWT_SECRET_SENTINEL` with value from `vault gen 64` (store in vault too); (2) Claude deploys: flip `KID_TO_BINDING['sentinel']` in this repo and `secret_name` in `~/workspace/sentinel-web/wrangler.toml` in one coordinated change. Signal Jim when ready to coordinate. (see CLAUDE.md, "Sentinel temporary signing-key state", open since 2026-05-25)
-- [ ] Migrate `DISCORD_WEBHOOK_URL` from a plain Worker secret to Cloudflare Secrets Store — best done at the next webhook rotation (see `reviews/remediation-status-2026-04-25.md` deferred-items table)
+- [ ] Migrate `DISCORD_WEBHOOK_URL` from a plain Worker secret to Cloudflare Secrets Store — best done at the next webhook rotation (Phase 1 deferred; prompt: `~/prompts/platform-discord-webhook-secrets-store.md`)
+- [ ] psychic-shield M3: nonce CSP — replace `'unsafe-inline'` in briefing templates with per-response nonces; needs full briefing-template audit, break risk outweighs current defensive value (Phase 1 deferred; prompt: `~/prompts/shield-m3-nonce-csp.md`)
+- [ ] psychic-shield: convert daemon to systemd unit — operational/fleet item, not code (Phase 1 deferred; prompt: `~/prompts/shield-daemon-systemd.md`)
+- [ ] ego-development M-new-3: server-side session-completion check — needs schema-aware response-count check + expected-stem-count source-of-truth (Phase 1 deferred; prompt: `~/prompts/ego-m-new-3-session-completion.md`)
+- [ ] ego-development M-new-8: delete-request feedback table — needs schema migration + admin UI updates (Phase 1 deferred; prompt: `~/prompts/ego-m-new-8-delete-request-feedback.md`)
+- [ ] mind-reader: review Polar H10 + HRV WIP — unrelated WIP from prior session, needs human review before commit (Phase 1 deferred; prompt: `~/prompts/mind-reader-polar-h10-review.md`)
 - [ ] v2 registry-driven rewrite — design approved 2026-07-19 (docs/design-v2-registry.md); check-in after slice 1. **Slice 0 in progress:**
   - [x] Slice 0 — freeze: projects.config.mjs + src/registry.js + test/v2-registry.test.mjs (equality tests green; no deploy)
   - [ ] Slice 1 — flip: replace 5 literals in worker.js with registry imports; delete getSigningKey + dead exports; npm test + test-auth.js green before and after; DEPLOY — then check in with Jim

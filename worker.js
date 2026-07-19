@@ -67,28 +67,39 @@ function validateRedirectUrl(url) {
   return url;
 }
 
+// v2-slice-0: extracted from inside redirectUrlToProject so the freeze test
+// can import and equality-check it against the registry derivation. Removed
+// in slice 1 when the worker imports HOST_TO_PROJECT from src/registry.js.
+const HOST_TO_PROJECT = {
+  'health.pragmaticdharma.org': 'health',
+  'sentinel.pragmaticdharma.org': 'sentinel',
+  'shield.pragmaticdharma.org': 'shield',
+  'psychology.pragmaticdharma.org': 'ego-assessment',
+  'mindreader.pragmaticdharma.org': 'mindreader',
+  'psychtools.pragmaticdharma.org': 'psychtools',
+  'astrology.pragmaticdharma.org': 'astrology',
+  'practice.pragmaticdharma.org': 'practice',
+  'bromnichord.pragmaticdharma.org': 'bromnichord',
+  'discern.pragmaticdharma.org': 'discern',
+  'review.pragmaticdharma.org': 'review',
+};
+
 function redirectUrlToProject(url) {
-  // Map subdomain URLs to project keys
-  const map = {
-    'health.pragmaticdharma.org': 'health',
-    'sentinel.pragmaticdharma.org': 'sentinel',
-    'shield.pragmaticdharma.org': 'shield',
-    'psychology.pragmaticdharma.org': 'ego-assessment',
-    'mindreader.pragmaticdharma.org': 'mindreader',
-    'psychtools.pragmaticdharma.org': 'psychtools',
-    'astrology.pragmaticdharma.org': 'astrology',
-    'practice.pragmaticdharma.org': 'practice',
-    'bromnichord.pragmaticdharma.org': 'bromnichord',
-    'discern.pragmaticdharma.org': 'discern',
-    'review.pragmaticdharma.org': 'review',
-  };
   try {
     const host = new URL(url).hostname;
-    return map[host] || null;
+    return HOST_TO_PROJECT[host] || null;
   } catch {
     return null;
   }
 }
+
+// v2-slice-0: extracted so the freeze test can equality-check these against
+// the registry-derived CSP_CONNECT_SRC_HOSTS. Removed in slice 1 when the
+// worker imports CSP_CONNECT_SRC_HOSTS from src/registry.js.
+const CSP_CONNECT_SRC_HOSTS = [
+  'https://health.pragmaticdharma.org',
+  'https://psychology.pragmaticdharma.org',
+];
 
 // M2: baseline CSP for the platform Worker. script-src/style-src allow
 // 'unsafe-inline' because admin.html and login.html have inline scripts;
@@ -100,7 +111,7 @@ const CSP_HEADER = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data:",
   "font-src 'self'",
-  "connect-src 'self' https://health.pragmaticdharma.org https://psychology.pragmaticdharma.org",
+  `connect-src 'self' ${CSP_CONNECT_SRC_HOSTS.join(' ')}`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -1474,3 +1485,8 @@ function redirectWithError(msg) {
 
 // Export for use by sub-project workers and unit tests
 export { verifyJWT, verifyJWTForRefresh, getJWTFromCookie, signJWT, accessEmbed, formatLocation, notifyDiscord };
+
+// v2-slice-0 freeze exports: equality-tested by test/v2-registry.test.mjs against
+// the registry-derived equivalents. Both sides removed in slice 1 when the worker
+// imports these from src/registry.js instead of defining them as literals.
+export { KNOWN_PROJECTS, REDIRECT_ALLOWLIST, KID_TO_BINDING, HOST_TO_PROJECT, CSP_CONNECT_SRC_HOSTS };

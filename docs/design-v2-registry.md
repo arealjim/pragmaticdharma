@@ -1,6 +1,11 @@
 # Design: v2 registry-driven rewrite
 
-Status: DESIGN — written 2026-07-18 (fable farewell prep), not yet reviewed by Jim. Prep only; execution is a later session.
+Status: APPROVED — written 2026-07-18, decisions recorded 2026-07-19. Slice 0 executing.
+
+**Jim's decisions (2026-07-19 board run):**
+- Ask 1 (Router): **Keep zero-dep** — no dependency ever enters the auth path.
+- Ask 2 (Scar scope): **Descope to standalone TODOs** — v2 stays a provable no-behavior-change refactor; CSP nonces / kid-check in verifier copies / parameterized pd SQL are three separate TODO items.
+- Ask 3 (Go-ahead): **Check-in after slice 1** — pause for Jim's nod after the riskiest flip deploy before continuing slices 2–4.
 
 This is the design-session output that `prompts/v2-registry-rewrite.md` calls for (it names the output `docs/v2-design.md`; it lives here instead — TODO.md pointer corrected). It builds on `docs/v2-registry-schema.md` (2026-07-04), which remains the schema of record; deltas to it are flagged below. Context: `docs/ARCHITECTURE.md`, worker.js.
 
@@ -82,7 +87,7 @@ No URL, cookie, claim, or redirect behavior. No D1 schema or data migration. No 
 - **Secrets Store CLI still broken** for `pd add-project` step 4 → the flow already treats dashboard as the expected fallback (sentinel scar institutionalized as a printed checklist).
 - **Parallel-session collisions** in this shared tree → each slice stages only its own files; slices are small enough to land same-day.
 
-## Open questions for Jim (zero-context asks)
+## Open questions for Jim (zero-context asks) — ALL DECIDED 2026-07-19
 
 **Ask 1 — router.** Context: the platform worker routes ~25 URL patterns with plain if-statements; the rewrite could adopt Hono, the standard Workers micro-framework, or keep zero dependencies. This design recommends zero-dep: the code is small, auth-critical, and dependency-free today. Question: keep zero-dep routing? Yes → no dependency ever enters the auth path; No (prefer Hono) → nicer handler ergonomics, one npm dependency to track, ~a day extra migration.
 

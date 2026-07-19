@@ -17,7 +17,7 @@
   you edited. Update TODO.md/CONTINUE.md, commit and push (git push origin main).
 
 ## Later
-- [ ] Restore per-project JWT signing-key independence for sentinel: create `JWT_SECRET_SENTINEL` via the Cloudflare dashboard, then flip `KID_TO_BINDING['sentinel']` in this repo and `secret_name` in `~/workspace/sentinel-web/wrangler.toml` together (see CLAUDE.md, "Sentinel temporary signing-key state", open since 2026-05-25)
+- [ ] Restore per-project JWT signing-key independence for sentinel — **needs Jim at the Cloudflare dashboard** (Jim approved 2026-07-19): (1) log into Cloudflare dashboard → Secrets Store `pragmaticdharma` → create `JWT_SECRET_SENTINEL` with value from `vault gen 64` (store in vault too); (2) Claude deploys: flip `KID_TO_BINDING['sentinel']` in this repo and `secret_name` in `~/workspace/sentinel-web/wrangler.toml` in one coordinated change. Signal Jim when ready to coordinate. (see CLAUDE.md, "Sentinel temporary signing-key state", open since 2026-05-25)
 - [ ] Migrate `DISCORD_WEBHOOK_URL` from a plain Worker secret to Cloudflare Secrets Store — best done at the next webhook rotation (see `reviews/remediation-status-2026-04-25.md` deferred-items table)
 - [ ] v2 registry-driven rewrite (design-first): collapse project onboarding to one registry entry + one deploy. Schema already drafted (`docs/v2-registry-schema.md`, `prompts/v2-registry-rewrite.md`); the design-session output (`docs/design-v2-registry.md`) is now written; implementation hasn't started
   Design written 2026-07-18: docs/design-v2-registry.md (fable farewell prep)
@@ -27,8 +27,7 @@
 - [ ] Add test coverage for `handleSignup` (per-IP/global rate limits, 30-day rejected-user cooldown, open-beta auto-approval), `handleAdmin` (CSRF Origin/Referer guard, approve/reject, the `config` key allowlist), `handleRefreshSession`, and `validateRedirectUrl`'s allowlist behavior — `npm test` currently only covers the magic-link/session/retention core (found 2026-07-17)
 - [ ] `GET /api/logout` mutates state (revokes the D1 session row) on a GET request, in addition to the existing `POST /api/logout` — make it POST-only so a bare `<img src>`/link-prefetch/third-party page can't force a logout (low severity, cheap fix; found 2026-07-17)
 - [ ] Add `"type": "module"` to `package.json` — every `npm test` run currently prints a `MODULE_TYPELESS_PACKAGE_JSON` Node warning per test file (found 2026-07-17)
-- [ ] Owner decision needed: relying parties (ego-assessment, astrology, discern, mind-reader, and health/tcm-tracker, which is a full relying party too) verify `pd_session` locally and never check the Hub's `sessions.revoked_at` — a logout or admin-reject at the Hub doesn't take effect at a relying party until that JWT's own 30-day expiry. Documented in `cto/docs/pd-auth-delta.md` as "Gap 1"; needs a design choice (short-lived JWTs + forced refresh vs. a revocation-check callback vs. a shared denylist) before it gets coded (surfaced again while writing `docs/ARCHITECTURE.md`, 2026-07-17)
-  Design written 2026-07-18: docs/design-session-revocation.md (fable farewell prep)
+- [x] Gap 1 revocation: 24h JWT TTL + lazy-refresh at `/login` — DONE 2026-07-19: `JWT_TTL_SECONDS=86400`, `verifyJWTForRefresh`, loop guard, `handleRefreshSession` updated; 24 unit tests green; deployed. Design: `docs/design-session-revocation.md`.
 - [ ] Add bot protection (Turnstile or similar) to the Hub's own `/api/login` — it has per-IP (20/hour) and per-email (3/hour) throttles but no CAPTCHA, so a botnet-scale IP pool can still slow-probe emails or burn the Resend quota. psyche already has this (see `cto/docs/pd-auth-delta.md` "Gap 5"); found again 2026-07-17
 
 ### Content extraction (folded from EXTRACTION_LIST.md 2026-07-12; background/context in `docs/extraction-notes.md`)
@@ -40,3 +39,5 @@
 - [ ] Explanations to write (each = one piece, pragmatic/scientific register): what is emptiness · Cook-Greuter + emptiness · shamatha how-to · how attention works · body scanning · lucid dreaming · acquired appearance quickly · dark night and what to do · freedom of vs from perspective · "we are not all one" (naive sense) · meditation ≠ stopping thoughts · you can learn to feel good (and must) · celebrate remembering, don't self-flagellate · learning to let go · meditation brings the full experience incl. the bad parts · math/physics/CS framings · controlled movement + attention investigation (original contribution)
 
 ## Done
+- [x] Remove ego-assessment card from landing page (`pages/index.html`) — DONE 2026-07-19 per Jim: "outdated and we're moving our concerns." App still live at psychology.pragmaticdharma.org but no longer listed on the portal.
+- [x] 24h JWT TTL + lazy /login refresh (session revocation Gap 1) — deployed 2026-07-19

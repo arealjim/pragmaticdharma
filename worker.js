@@ -237,6 +237,49 @@ export default {
         return htmlResponse(injected);
       }
       if (method === 'GET' && path === '/login') {
+        // Lazy refresh: expired-but-valid sessions silently re-mint via the Hub
+        // without user interaction, making 24h JWT expiry invisible to users.
+        // Loop guard (pd_lr cookie) caps at one silent redirect per 30s so a
+        // misconfigured relying party can't bounce us in a redirect loop.
+        const redirect = validateRedirectUrl(url.searchParams.get('redirect'));
+        const cookieStr = request.headers.get('Cookie') || '';
+        const loopGuard = /(?:^|;)\s*pd_lr=1/.test(cookieStr);
+
+        const jwtCookie = redirect && !loopGuard && getJWTFromCookie(request);
+        if (jwtCookie) {
+          const payload = await verifyJWTForRefresh(env, jwtCookie);
+          if (payload) {
+            const user = await env.DB.prepare(
+              'SELECT id, email, name, role, status FROM users WHERE id = ?'
+            ).bind(payload.sub).first();
+            if (user && user.status === 'approved') {
+              const projectRows = await env.DB.prepare(
+                'SELECT project FROM user_projects WHERE user_id = ?'
+              ).bind(user.id).all();
+              const projects = projectRows.results.map(r => r.project);
+              const newJwt = await signJWT(env, {
+                sub: user.id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                projects,
+                sessionToken: payload.sessionToken,
+              }, kidForRedirect(redirect));
+              const headers = new Headers();
+              headers.append('Location', redirect);
+              headers.append('Set-Cookie', sessionCookie(newJwt));
+              headers.append('Set-Cookie', 'pd_lr=1; Path=/login; Max-Age=30; Secure; HttpOnly; SameSite=Lax');
+              return new Response(null, { status: 302, headers });
+            }
+          }
+        }
+
+        if (loopGuard) {
+          const headers = new Headers(HTML_HEADERS);
+          headers.append('Set-Cookie', 'pd_lr=; Path=/login; Max-Age=0; Secure; HttpOnly; SameSite=Lax');
+          return new Response(LOGIN_HTML, { headers });
+        }
+
         return htmlResponse(LOGIN_HTML);
       }
       if (method === 'GET' && path === '/signup') {
@@ -704,7 +747,7 @@ async function handleRefreshSession(request, env) {
     return Response.redirect(loginUrl, 302);
   }
 
-  const payload = await verifyJWT(env, jwt);
+  const payload = await verifyJWTForRefresh(env, jwt);
   if (!payload) {
     const loginUrl = redirect ? `${loginBase}?redirect=${encodeURIComponent(redirect)}` : loginBase;
     return Response.redirect(loginUrl, 302);
@@ -989,10 +1032,12 @@ async function getSigningKeyForKid(env, kid) {
   );
 }
 
+const JWT_TTL_SECONDS = 86400; // 24h; cookie Max-Age stays 30d so expired JWTs still reach /login for refresh
+
 async function signJWT(env, payload, kid = 'pragmaticdharma') {
   const header = { alg: 'HS256', typ: 'JWT', kid };
   const now = Math.floor(Date.now() / 1000);
-  const claims = { ...payload, iat: now, exp: now + 30 * 24 * 60 * 60 };
+  const claims = { ...payload, iat: now, exp: now + JWT_TTL_SECONDS };
 
   const encodedHeader = base64url(JSON.stringify(header));
   const encodedPayload = base64url(JSON.stringify(claims));
@@ -1041,6 +1086,46 @@ async function verifyJWT(env, token) {
         'SELECT revoked_at FROM sessions WHERE token IN (?, ?)'
       ).bind(await sha256Hex(payload.sessionToken), payload.sessionToken).first();
       if (!session || session.revoked_at) return null;
+    }
+
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+// Like verifyJWT but skips the exp check — used for lazy refresh at /login.
+// The session row's expires_at is the authority instead of the JWT exp claim.
+// Signature and kid validation are still strict.
+async function verifyJWTForRefresh(env, token) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+
+    const [encodedHeader, encodedPayload, encodedSig] = parts;
+
+    const header = JSON.parse(atob(encodedHeader.replace(/-/g, '+').replace(/_/g, '/')));
+    if (header.alg !== 'HS256') return null;
+
+    const kid = header.kid;
+    if (!kid || !KID_TO_BINDING[kid]) return null;
+
+    const signingInput = `${encodedHeader}.${encodedPayload}`;
+    const key = await getSigningKeyForKid(env, kid);
+    if (!key) return null;
+    const sig = base64urlDecode(encodedSig);
+    const valid = await crypto.subtle.verify('HMAC', key, sig, new TextEncoder().encode(signingInput));
+    if (!valid) return null;
+
+    const payload = JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
+
+    if (payload.sessionToken && env.DB) {
+      const session = await env.DB.prepare(
+        'SELECT revoked_at, expires_at FROM sessions WHERE token IN (?, ?)'
+      ).bind(await sha256Hex(payload.sessionToken), payload.sessionToken).first();
+      if (!session || session.revoked_at) return null;
+      // Row expires_at is the hard ceiling (30d); JWT exp is not checked here.
+      if (new Date(session.expires_at) < new Date()) return null;
     }
 
     return payload;
@@ -1387,5 +1472,5 @@ function redirectWithError(msg) {
   });
 }
 
-// Export for use by sub-project workers
-export { verifyJWT, getJWTFromCookie, signJWT, accessEmbed, formatLocation, notifyDiscord };
+// Export for use by sub-project workers and unit tests
+export { verifyJWT, verifyJWTForRefresh, getJWTFromCookie, signJWT, accessEmbed, formatLocation, notifyDiscord };

@@ -7,13 +7,14 @@ export const ORIGIN = 'https://pragmaticdharma.org';
 
 export function makeEnv() {
   const db = createFakeD1();
-  return {
-    DB: db,
-    // getSecret() accepts plain string bindings, so tests can inject secrets
-    // without a Secrets Store. All kids sign with the same test key here.
-    JWT_SECRET_PRAGMATICDHARMA: TEST_SECRET,
-    RESEND_API_KEY: 'test-resend-key',
-  };
+  // All per-service JWT secrets use the same test key; getSecret() accepts
+  // plain string bindings without a Secrets Store.
+  const jwtSecrets = {};
+  for (const svc of ['PRAGMATICDHARMA', 'EGO_ASSESSMENT', 'SHIELD', 'MINDREADER',
+    'PSYCHTOOLS', 'ASTROLOGY', 'PRACTICE', 'HEALTH', 'BROMNICHORD', 'DISCERN', 'REVIEW']) {
+    jwtSecrets[`JWT_SECRET_${svc}`] = TEST_SECRET;
+  }
+  return { DB: db, ...jwtSecrets, RESEND_API_KEY: 'test-resend-key' };
 }
 
 export function seedUser(env, { email = 'user@example.com', name = 'Test User', role = 'user', status = 'approved', projects = [] } = {}) {
@@ -86,4 +87,29 @@ export function getCookie(resp, name = 'pd_session') {
   const setCookie = resp.headers.get('set-cookie') || '';
   const m = setCookie.match(new RegExp(`${name}=([^;]*)`));
   return m ? m[1] : null;
+}
+
+// Mint a correctly-signed JWT with exp in the past — used to test
+// verifyJWTForRefresh without mocking Date.now().
+export async function mintExpiredJWT(env, { sub, email, name, role, projects, sessionToken }) {
+  function b64url(data) {
+    const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data);
+    const base64 = btoa(String.fromCharCode(...bytes));
+    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'HS256', typ: 'JWT', kid: 'pragmaticdharma' };
+  const claims = { sub, email, name, role, projects, sessionToken, iat: now - 90000, exp: now - 3600 };
+  const encodedHeader = b64url(JSON.stringify(header));
+  const encodedPayload = b64url(JSON.stringify(claims));
+  const signingInput = `${encodedHeader}.${encodedPayload}`;
+  const secret = typeof env.JWT_SECRET_PRAGMATICDHARMA === 'string'
+    ? env.JWT_SECRET_PRAGMATICDHARMA
+    : await env.JWT_SECRET_PRAGMATICDHARMA.get();
+  const key = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(signingInput));
+  return `${signingInput}.${b64url(sig)}`;
 }

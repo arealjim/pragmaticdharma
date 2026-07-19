@@ -27,7 +27,11 @@
   .msg { margin-top: 0.75rem; font-size: 0.9rem; }
   .msg.ok { color: var(--accent); }
   .msg.err { color: var(--err); }
-  .switch { margin-top: 1rem; text-align: center; font-size: 0.9rem; color: var(--muted); }
+  .switch { margin-top: 1.5rem; text-align: center; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; }
+  .switch-lead { font-size: 1.15rem; font-weight: 600; color: var(--fg); margin-bottom: 0.4rem; }
+  .switch-text { font-size: 0.95rem; color: var(--muted); margin-bottom: 1.25rem; line-height: 1.5; }
+  .switch-cta { display: inline-block; font-size: 1.1rem; font-weight: 600; padding: 0.65rem 1.5rem; border: 1px solid var(--accent); border-radius: 4px; }
+  .switch-cta:hover { background: var(--accent); color: var(--bg); text-decoration: none; }
   @media (prefers-color-scheme: light) {
     :root { --bg: #fafafa; --fg: #222; --accent: #0d7377; --muted: #666; --border: #ddd; --card-bg: #fff; }
   }
@@ -58,7 +62,9 @@
   </div>
 
   <div class="switch">
-    Don't have access? <a id="signup-link" href="/signup">Request access</a>
+    <p class="switch-lead">New here?</p>
+    <p class="switch-text">This is a private, invite-only platform. If you don't have an account yet, request access and we'll get you set up.</p>
+    <a id="signup-link" class="switch-cta" href="/signup">Request access &rarr;</a>
   </div>
 </div>
 

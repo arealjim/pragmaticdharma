@@ -1,6 +1,14 @@
 # Design: pd_session revocation + signing-key rotation
 
-Status: DESIGN — written 2026-07-18 (fable farewell prep), not yet reviewed by Jim. Prep only; execution is a later session.
+Status: IMPLEMENTED — design approved and built 2026-07-19. See Decisions section below.
+
+## Decisions (2026-07-19)
+
+**Ask 1 — token lifetime:** YES — 24h is acceptable. Built as specced: `JWT_TTL_SECONDS = 86400`, cookie `Max-Age` stays 30d, lazy-refresh at `/login` keeps UX silent.
+
+**Ask 2 — ego-assessment frontend:** Jim directed: "actually let's take down ego-assessment and not show it on the pd webpage anymore. it's outdated and we're moving our concerns." Action taken: removed the Ego Development card from `pages/index.html`. The app remains live at `psychology.pragmaticdharma.org` (its auth needs no change — api-gate, 401s on expiry, not worker-gate). No pd-sso hook added.
+
+**Ask 3 — sentinel signing key:** YES — schedule the dashboard step in a session with Jim present. Sentinel restoration is tracked in TODO.md ## Now; Jim needs to be at the Cloudflare dashboard to create `JWT_SECRET_SENTINEL` in the Secrets Store, then Claude deploys the two-repo change.
 
 Covers Gaps 1 and 4 from `cto/docs/pd-auth-delta.md`. Companion reading: `docs/AUTH-DESIGN.md` (which proposed the direction this doc makes concrete), `docs/ARCHITECTURE.md` §3/§6.
 

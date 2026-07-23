@@ -13,6 +13,7 @@ const VALID_STATUSES = new Set(['live', 'soon', 'hidden']);
   const keys = new Set();
   const subdomains = new Set();
   const kids = new Set();
+  const hosts = new Set();  // every host (subdomain + aliasHosts) must be unique
   for (const p of projects) {
     if (!p.key || !p.subdomain || !p.kid || !p.gate || !p.status || typeof p.adminConnect !== 'boolean') {
       throw new Error(`registry: project missing required field(s): ${JSON.stringify(p)}`);
@@ -28,6 +29,21 @@ const VALID_STATUSES = new Set(['live', 'soon', 'hidden']);
     keys.add(p.key);
     subdomains.add(p.subdomain);
     kids.add(p.kid);
+    const primaryHost = `${p.subdomain}.pragmaticdharma.org`;
+    if (hosts.has(primaryHost)) throw new Error(`registry: duplicate host '${primaryHost}'`);
+    hosts.add(primaryHost);
+    // aliasHosts — extra hostnames served by the SAME worker under the SAME
+    // project key/kid (e.g. review's read-only board mirror). They inherit the
+    // project's kid, so their JWTs verify against the same JWT_SECRET_<KID>.
+    if (p.aliasHosts !== undefined) {
+      if (!Array.isArray(p.aliasHosts) || p.aliasHosts.some(h => typeof h !== 'string' || !h)) {
+        throw new Error(`registry: aliasHosts on '${p.key}' must be an array of non-empty strings`);
+      }
+      for (const h of p.aliasHosts) {
+        if (hosts.has(h)) throw new Error(`registry: duplicate host '${h}' (aliasHosts on '${p.key}')`);
+        hosts.add(h);
+      }
+    }
   }
 })(PROJECTS);
 
@@ -42,12 +58,16 @@ export const REDIRECT_ALLOWLIST = new Set([
   'pragmaticdharma.org',
   'retreats.pragmaticdharma.org',
   ...PROJECTS.map(p => `${p.subdomain}.pragmaticdharma.org`),
+  ...PROJECTS.flatMap(p => p.aliasHosts ?? []),
 ]);
 
-// Host → project key map for post-login redirect routing.
-export const HOST_TO_PROJECT = Object.fromEntries(
-  PROJECTS.map(p => [`${p.subdomain}.pragmaticdharma.org`, p.key])
-);
+// Host → project key map for post-login redirect routing. aliasHosts resolve to
+// their project's key (and therefore its kid), so a JWT minted for the mirror
+// host is signed with the same key the worker verifies with.
+export const HOST_TO_PROJECT = Object.fromEntries([
+  ...PROJECTS.map(p => [`${p.subdomain}.pragmaticdharma.org`, p.key]),
+  ...PROJECTS.flatMap(p => (p.aliasHosts ?? []).map(h => [h, p.key])),
+]);
 
 // kid → Secrets Store binding name.
 // The platform hub ('pragmaticdharma') entry is fixed — it signs the initial session JWT.

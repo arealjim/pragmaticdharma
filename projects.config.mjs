@@ -156,7 +156,14 @@ export const PROJECTS = [
   },
 
   // ── review ───────────────────────────────────────────────────────────────────
-  // Business-ops review dashboard (majordomo project) — hidden from index
+  // Business-ops review dashboard (majordomo project) — hidden from index.
+  // aliasHosts: boardreview.* is the read-only board mirror served by the SAME
+  // majordomo worker (behaviour keys off the request host). It shares the review
+  // project key + kid=review, so board members granted `review` reach the mirror
+  // and their JWTs verify against JWT_SECRET_REVIEW. The majordomo worker's own
+  // email allow-list + admin-role gate keeps board members OUT of the full admin
+  // app at review.* — holding the `review` claim alone does not admit them there
+  // (see majordomo review-app/worker.js isAuthorized).
   {
     key:          'review',
     subdomain:    'review',
@@ -165,6 +172,7 @@ export const PROJECTS = [
     status:       'hidden',
     adminConnect: false,
     label:        'Review',
+    aliasHosts:   ['boardreview.pragmaticdharma.org'],
     testProbe:    '/',
   },
 ];

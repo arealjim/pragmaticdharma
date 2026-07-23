@@ -278,8 +278,13 @@
       });
   }
 
-  var ALL_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice', 'sentinel', 'bromnichord', 'discern'];
-  var PROJECT_LABELS = { health: 'Health', shield: 'Shield', 'ego-assessment': 'Ego', mindreader: 'Mind Reader', psychtools: 'PsychTools', astrology: 'Astrology', practice: 'Practice', sentinel: 'Sentinel', bromnichord: 'Bromnichord', discern: 'Discern' };
+  // NB: hardcoded, must stay in sync with projects.config.mjs PROJECTS (this is a
+  // static page that can't import the registry mjs). 'review' grants the `review`
+  // claim — for board members that unlocks the read-only mirror at
+  // boardreview.pragmaticdharma.org; the majordomo worker's own admin+allowlist
+  // gate still keeps them out of the full admin app at review.*.
+  var ALL_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice', 'sentinel', 'bromnichord', 'discern', 'review'];
+  var PROJECT_LABELS = { health: 'Health', shield: 'Shield', 'ego-assessment': 'Ego', mindreader: 'Mind Reader', psychtools: 'PsychTools', astrology: 'Astrology', practice: 'Practice', sentinel: 'Sentinel', bromnichord: 'Bromnichord', discern: 'Discern', review: 'Board Review' };
   var usersData = [];
   var healthUsers = {}; // email -> {id, opus_enabled}
 

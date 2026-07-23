@@ -21,16 +21,21 @@ test('KNOWN_PROJECTS has one entry per project', () => {
   ]);
 });
 
-test('REDIRECT_ALLOWLIST has 13 hosts (11 projects + apex + retreats)', () => {
-  assert.equal(REDIRECT_ALLOWLIST.size, 13, 'allowlist must have exactly 13 hosts');
+test('REDIRECT_ALLOWLIST has 14 hosts (11 projects + apex + retreats + boardreview alias)', () => {
+  assert.equal(REDIRECT_ALLOWLIST.size, 14, 'allowlist must have exactly 14 hosts');
   assert.ok(REDIRECT_ALLOWLIST.has('pragmaticdharma.org'));
   assert.ok(REDIRECT_ALLOWLIST.has('retreats.pragmaticdharma.org'));
   assert.ok(REDIRECT_ALLOWLIST.has('psychology.pragmaticdharma.org'));
+  assert.ok(REDIRECT_ALLOWLIST.has('boardreview.pragmaticdharma.org'), 'board mirror alias must be allow-listed');
 });
 
-test('HOST_TO_PROJECT has 11 entries and maps psychology.* to ego-assessment', () => {
-  assert.equal(Object.keys(HOST_TO_PROJECT).length, 11, 'host map must have exactly 11 entries');
+test('HOST_TO_PROJECT has 12 entries and maps aliases (psychology.*, boardreview.*)', () => {
+  assert.equal(Object.keys(HOST_TO_PROJECT).length, 12, 'host map must have exactly 12 entries');
   assert.equal(HOST_TO_PROJECT['psychology.pragmaticdharma.org'], 'ego-assessment');
+  // boardreview alias resolves to the review project so its JWT is signed with
+  // kid=review (JWT_SECRET_REVIEW) — the key the majordomo worker verifies with.
+  assert.equal(HOST_TO_PROJECT['boardreview.pragmaticdharma.org'], 'review');
+  assert.equal(KID_TO_BINDING[HOST_TO_PROJECT['boardreview.pragmaticdharma.org']], 'JWT_SECRET_REVIEW');
 });
 
 test('KID_TO_BINDING has 12 entries (11 projects + platform) and honors sentinel override', () => {

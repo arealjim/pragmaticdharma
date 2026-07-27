@@ -219,6 +219,50 @@ async function testReviewSite(secret) {
 }
 
 /**
+ * Board review mirror (boardreview.pragmaticdharma.org) — since the 2026-07-27
+ * hardening (todo-board card 5d077131052f) this is its own least-privilege
+ * project claim, NOT `review`. Signed with the review secret (kidBindingOverride
+ * in projects.config.mjs — majordomo's review-app verifies both hosts with the
+ * single JWT_SECRET_REVIEW binding), but the claim itself must be `boardreview`.
+ */
+async function testBoardReviewSite(secret) {
+  const url = 'https://boardreview.pragmaticdharma.org/';
+  const kid = 'boardreview';
+  const ADMIN_EMAIL = 'jimirving2@gmail.com';
+  const BOARD_EMAIL = 'tucker.peck@gmail.com';
+  console.log(`\n${COLORS.cyan}${COLORS.bold}Board Review${COLORS.reset} ${COLORS.dim}${url} (board allowlist, no admin role required)${COLORS.reset}`);
+  let passed = 0, failed = 0;
+
+  async function check(label, cookie, expected) {
+    try {
+      const h = {};
+      if (cookie) h['Cookie'] = `pd_session=${cookie}`;
+      const resp = await fetch(url, { method: 'GET', headers: h, redirect: 'manual' });
+      if (statusMatches(resp.status, expected)) { console.log(pass(`${label} → ${resp.status}`)); passed++; }
+      else { console.log(fail(`${label} → ${resp.status}`, `expected ${expected.join('|')}`)); failed++; }
+    } catch (err) { console.log(fail(`${label} → ERROR`, err.message)); failed++; }
+  }
+
+  // No cookie → redirect to login.
+  await check('No cookie', null, [302, 301]);
+  // Board member, non-admin role, boardreview claim → 200 (board mirror needs no admin role).
+  const board = await signJWT(makePayload(['boardreview'], { role: 'user', email: BOARD_EMAIL }), secret, kid);
+  await check('Board member + boardreview claim', board, [200]);
+  // Jim (allow-listed) also works on the mirror.
+  const jim = await signJWT(makePayload(['boardreview'], { role: 'admin', email: ADMIN_EMAIL }), secret, kid);
+  await check('Jim + boardreview claim', jim, [200]);
+  // Board member with the OLD `review` claim but no `boardreview` claim → refresh
+  // bounce or forbidden — proves the split actually took, not just the allowlist.
+  const staleClaim = await signJWT(makePayload(['review'], { role: 'user', email: BOARD_EMAIL }), secret, kid);
+  await check('Board member, only stale review claim → not admitted', staleClaim, [302, 403]);
+  // Non-board, non-Jim email with boardreview claim → 403 (allowlist still gates).
+  const notBoard = await signJWT(makePayload(['boardreview'], { role: 'user', email: 'someone.else@example.com' }), secret, kid);
+  await check('Non-board email, has claim → forbidden', notBoard, [403]);
+
+  return { passed, failed };
+}
+
+/**
  * Critical-endpoint auth tests for ego-development-app-api.
  *
  * Targets endpoints identified in the 2026-04-23 security review as
@@ -318,7 +362,7 @@ async function main() {
   }
 
   console.log(`${COLORS.bold}Auth Enforcement Tests${COLORS.reset}`);
-  console.log(`${COLORS.dim}Testing 8 sites × 7 scenarios + 6 review-policy tests + 3 ego critical-endpoint tests${COLORS.reset}`);
+  console.log(`${COLORS.dim}Testing 8 sites × 7 scenarios + 6 review-policy tests + 5 board-review-policy tests + 3 ego critical-endpoint tests${COLORS.reset}`);
 
   const sites = [
     { name: 'Psychic Shield', url: 'https://shield.pragmaticdharma.org/',                   projectKey: 'shield',          authStyle: 'worker-gate', kid: 'shield' },
@@ -344,6 +388,10 @@ async function main() {
   const review = await testReviewSite(keys.review);
   totalPassed += review.passed;
   totalFailed += review.failed;
+
+  const boardReview = await testBoardReviewSite(keys.review);
+  totalPassed += boardReview.passed;
+  totalFailed += boardReview.failed;
 
   const ego = await testEgoCriticals();
   totalPassed += ego.passed;

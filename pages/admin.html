@@ -279,12 +279,14 @@
   }
 
   // NB: hardcoded, must stay in sync with projects.config.mjs PROJECTS (this is a
-  // static page that can't import the registry mjs). 'review' grants the `review`
-  // claim — for board members that unlocks the read-only mirror at
-  // boardreview.pragmaticdharma.org; the majordomo worker's own admin+allowlist
-  // gate still keeps them out of the full admin app at review.*.
-  var ALL_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice', 'sentinel', 'bromnichord', 'discern', 'review'];
-  var PROJECT_LABELS = { health: 'Health', shield: 'Shield', 'ego-assessment': 'Ego', mindreader: 'Mind Reader', psychtools: 'PsychTools', astrology: 'Astrology', practice: 'Practice', sentinel: 'Sentinel', bromnichord: 'Bromnichord', discern: 'Discern', review: 'Board Review' };
+  // static page that can't import the registry mjs). 'review' is the full ODF
+  // admin app (staff only — majordomo's own admin+allowlist gate is what actually
+  // restricts it). 'boardreview' is the separate least-privilege claim for board
+  // members' read-only mirror at boardreview.pragmaticdharma.org — since the
+  // 2026-07-27 hardening (todo-board card 5d077131052f) it no longer shares the
+  // 'review' claim.
+  var ALL_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice', 'sentinel', 'bromnichord', 'discern', 'review', 'boardreview'];
+  var PROJECT_LABELS = { health: 'Health', shield: 'Shield', 'ego-assessment': 'Ego', mindreader: 'Mind Reader', psychtools: 'PsychTools', astrology: 'Astrology', practice: 'Practice', sentinel: 'Sentinel', bromnichord: 'Bromnichord', discern: 'Discern', review: 'Review (staff)', boardreview: 'Board Review' };
   var usersData = [];
   var healthUsers = {}; // email -> {id, opus_enabled}
 

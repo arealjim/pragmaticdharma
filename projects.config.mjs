@@ -157,13 +157,9 @@ export const PROJECTS = [
 
   // ── review ───────────────────────────────────────────────────────────────────
   // Business-ops review dashboard (majordomo project) — hidden from index.
-  // aliasHosts: boardreview.* is the read-only board mirror served by the SAME
-  // majordomo worker (behaviour keys off the request host). It shares the review
-  // project key + kid=review, so board members granted `review` reach the mirror
-  // and their JWTs verify against JWT_SECRET_REVIEW. The majordomo worker's own
-  // email allow-list + admin-role gate keeps board members OUT of the full admin
-  // app at review.* — holding the `review` claim alone does not admit them there
-  // (see majordomo review-app/worker.js isAuthorized).
+  // Full admin app at review.* — staff only (role==='admin' + email allowlist in
+  // majordomo review-app/worker.js). Board members hold `boardreview` (below),
+  // NOT this claim, since 2026-07-27 hardening (todo-board card 5d077131052f).
   {
     key:          'review',
     subdomain:    'review',
@@ -172,7 +168,28 @@ export const PROJECTS = [
     status:       'hidden',
     adminConnect: false,
     label:        'Review',
-    aliasHosts:   ['boardreview.pragmaticdharma.org'],
     testProbe:    '/',
+  },
+
+  // ── boardreview ──────────────────────────────────────────────────────────────
+  // Read-only board mirror, served by the SAME majordomo worker as `review`
+  // (behaviour keys off the request host) but as its own least-privilege claim —
+  // holding it does NOT admit to the full admin app at review.* (see majordomo
+  // review-app/worker.js isAuthorized). Deliberately not its own host on `review`
+  // via aliasHosts: a distinct project key lets grants be scoped to board members
+  // only. kidBindingOverride: reuses JWT_SECRET_REVIEW rather than provisioning a
+  // new Secrets Store secret — majordomo's review-app already verifies both hosts
+  // with that one binding, so no majordomo wrangler.toml change is needed.
+  {
+    key:                     'boardreview',
+    subdomain:               'boardreview',
+    kid:                     'boardreview',
+    kidBindingOverride:      'JWT_SECRET_REVIEW',
+    kidBindingOverrideNotes: '2026-07-27: shares the review kid\'s secret on purpose — majordomo review-app verifies both review.* and boardreview.* with the single JWT_SECRET_REVIEW binding; only the project *claim* differs (least-privilege split, not a key rotation). Board grants: todo-board card 5d077131052f.',
+    gate:                    'worker-gate',
+    status:                  'hidden',
+    adminConnect:            false,
+    label:                   'Board Review',
+    testProbe:               '/',
   },
 ];

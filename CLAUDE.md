@@ -45,7 +45,7 @@ All 12 sub-projects are Cloudflare Workers (Pages migration complete 2026-04-25;
 | astrology.pragmaticdharma.org | `astrology-workers` | worker-gate (302/403) | Frontend + biggie Claude proxy at `astrology-api.pragmaticdharma.org` |
 | practice.pragmaticdharma.org | `practice-workers` | worker-gate (302/403) | Frontend + biggie Claude proxy at `practice-api.pragmaticdharma.org` |
 | sentinel.pragmaticdharma.org | `sentinel-web` | worker-gate (302/403) + admin-email allowlist | Admin-only preparedness dashboard; reads `sentinel_*` tables in shared D1 |
-| psychology.pragmaticdharma.org | `ego-assessment-workers` | api-gate (401) | Ego development assessment; Anthropic API |
+| psychology.pragmaticdharma.org | `ego-assessment-workers` | api-gate (401) | LEGACY, site CLOSED 2026-07-25 — middleware 503s everything; corpus intact |
 | health.pragmaticdharma.org | `tcm-tracker` (Flask via cloudflared) | api-gate (401) | Health tracking on biggie |
 | bromnichord.pragmaticdharma.org | `bromnichord-workers` | worker-gate (302/403) | Chiptune omnichord instrument; static assets only |
 | discern.pragmaticdharma.org | `discern-workers` | worker-gate (302/403) | Calibration training game (~/workspace/discern); static assets only, localStorage data |

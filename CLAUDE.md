@@ -35,7 +35,7 @@ Full login sequence, JWT-verification sequence, D1 retention schedule, and failu
 
 ## Sub-Projects
 
-All 11 sub-projects are Cloudflare Workers (Pages migration complete 2026-04-25; discern added 2026-06-12; review added 2026-07-17). Each verifies JWTs with its own per-service key (`kid` claim selects the right key).
+All 12 sub-projects are Cloudflare Workers (Pages migration complete 2026-04-25; discern added 2026-06-12; review added 2026-07-17; boardreview split out 2026-07-27). Each verifies JWTs with its own per-service key (`kid` claim selects the right key). **The registry source of truth is `projects.config.mjs`** (validated + derived by `src/registry.js`) — check it before trusting this table.
 
 | Subdomain | Worker | Auth Style | Notes |
 |-----------|--------|------------|-------|
@@ -49,11 +49,12 @@ All 11 sub-projects are Cloudflare Workers (Pages migration complete 2026-04-25;
 | health.pragmaticdharma.org | `tcm-tracker` (Flask via cloudflared) | api-gate (401) | Health tracking on biggie |
 | bromnichord.pragmaticdharma.org | `bromnichord-workers` | worker-gate (302/403) | Chiptune omnichord instrument; static assets only |
 | discern.pragmaticdharma.org | `discern-workers` | worker-gate (302/403) | Calibration training game (~/workspace/discern); static assets only, localStorage data |
-| review.pragmaticdharma.org | `review-workers` | worker-gate (302/403) | Business-ops review dashboard (majordomo project); own D1 `review-db`; `/api/ingest` accepts bearer `INGEST_TOKEN_REVIEW` from odf-application-pipeline |
+| review.pragmaticdharma.org | `review-workers` | worker-gate (302/403) | Business-ops review dashboard (majordomo project), staff/admin only; own D1 `review-db`; `/api/ingest` accepts bearer `INGEST_TOKEN_REVIEW` from odf-application-pipeline |
+| boardreview.pragmaticdharma.org | same majordomo worker as review | worker-gate (302/403) | Read-only board mirror — its own least-privilege project claim (does NOT admit to review.*); deliberately reuses `JWT_SECRET_REVIEW` via `kidBindingOverride` (2026-07-27) |
 
 The legacy magic-link auth (ego_session) was retired. Subdomain `ego-assessment.pages.dev` is going away once the old Pages project is deleted.
 
-**Sentinel temporary signing-key state (2026-05-25):** `KID_TO_BINDING['sentinel']` currently maps to `JWT_SECRET_PRAGMATICDHARMA` rather than a per-project `JWT_SECRET_SENTINEL`. The wrangler secrets-store beta CLI couldn't create the per-project entry (defaulted to local-only mode without `--remote`); the keepass DB password to retry via dashboard wasn't immediately available. Sentinel-web's `wrangler.toml` binds its `JWT_SECRET` to the same `JWT_SECRET_PRAGMATICDHARMA` entry so sign value ≡ verify value. To restore per-project rotation independence: create `JWT_SECRET_SENTINEL` via the dashboard, then flip `KID_TO_BINDING['sentinel']` in this repo AND `secret_name` in `~/workspace/sentinel-web/wrangler.toml` in the same change.
+**Sentinel temporary signing-key state (2026-05-25, still current 2026-07-31):** sentinel's kid maps to `JWT_SECRET_PRAGMATICDHARMA` rather than a per-project `JWT_SECRET_SENTINEL` (the wrangler secrets-store beta CLI couldn't create the entry at the time). The mapping now lives as `kidBindingOverride` on the sentinel entry in `projects.config.mjs`. Sentinel-web's `wrangler.toml` binds its `JWT_SECRET` to the same `JWT_SECRET_PRAGMATICDHARMA` entry so sign value ≡ verify value. To restore per-project rotation independence: create `JWT_SECRET_SENTINEL` via the dashboard, then flip the override in `projects.config.mjs` AND `secret_name` in `~/workspace/sentinel-web/wrangler.toml` in the same change. (boardreview's override is different: it shares `JWT_SECRET_REVIEW` **on purpose** — least-privilege claim split, not a workaround.)
 
 ## Secrets
 
@@ -76,30 +77,25 @@ All platform secrets live in **Cloudflare Secrets Store** under store name `prag
 ## Files
 
 ```
-worker.js           # Main Worker (~500 lines): routing, auth, admin, JWT, Resend, Discord
-schema.sql          # D1 schema (users, magic_links, sessions, access_logs, config)
-wrangler.toml       # Worker config + D1 binding
-package.json        # Wrangler dev dependency
-pd                  # Admin CLI (bash, wraps wrangler d1 execute)
-test-auth.js        # Auth enforcement integration tests (45 tests across 6 subdomains + ego criticals)
-pages/
-  index.html        # Landing page (project cards)
-  login.html        # Login form (email + 6-digit code)
-  signup.html       # Signup form (name, email, note)
-  resources.html    # Meditation maps (from original index.html)
+worker.js             # Main Worker (~1400 lines): routing, auth, admin, JWT, Resend, Discord
+projects.config.mjs   # PROJECT REGISTRY — source of truth for sub-projects/kids/gates
+src/registry.js       # Registry validation + derived structures (KID_TO_BINDING etc.)
+schema.sql            # D1 schema (users, magic_links, sessions, access_logs, config)
+wrangler.toml         # Worker config + D1 binding
+pd                    # Admin CLI (bash, wraps wrangler d1 execute)
+test-auth.js          # Live auth enforcement matrix (see Testing — effectively unrunnable)
+test/                 # Unit suite (node --test, in-memory D1) — the real safety net
+pages/                # index, login, signup, admin, resources, retreats
 shared/
   auth-cloudflare.js  # Canonical JWT auth for Cloudflare Workers/Pages
   auth-flask.py       # Canonical JWT auth for Python/Flask
   nav-bar.html        # Platform navigation bar template
   README.md           # Auth & nav integration guide
-docs/
-  ai-development-guide.md          # Phase 3: patterns, gotchas, security checklist
+docs/                 # ARCHITECTURE.md, AUTH-DESIGN.md, v2-registry design/schema, ai-development-guide.md
 reviews/
   2026-04-23-<service>.md          # Phase 1 audit reports
   remediation-status-2026-04-25.md # Master remediation tracker (closed + deferred)
 ```
-
-For deferred items: prompt files live at `~/prompts/`. See the remediation tracker for which prompts cover which findings.
 
 ## Testing
 

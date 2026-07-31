@@ -6,15 +6,34 @@
   <title>Retreat Finder — Meditation &amp; Contemplative Retreat Directory</title>
   <style>
     :root {
+      color-scheme: light;
       --bg: #faf9f7;
       --card-bg: #fff;
       --text: #2d2d2d;
       --muted: #6b6b6b;
+      --desc: #444;
       --accent: #5a7d5a;
       --accent-light: #e8f0e8;
       --border: #e5e2dd;
       --shadow: 0 1px 3px rgba(0,0,0,0.06);
+      --hover-shadow: 0 3px 12px rgba(0,0,0,0.08);
       --radius: 10px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --bg: #181a17;
+        --card-bg: #20231f;
+        --text: #d8dad4;
+        --muted: #9a9d96;
+        --desc: #b8bbb3;
+        --accent: #8fae8f;
+        --accent-light: #2b352b;
+        --border: #35392f;
+        --shadow: 0 1px 3px rgba(0,0,0,0.35);
+        --hover-shadow: 0 3px 12px rgba(0,0,0,0.5);
+      }
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -84,7 +103,7 @@
     }
 
     .card:hover {
-      box-shadow: 0 3px 12px rgba(0,0,0,0.08);
+      box-shadow: var(--hover-shadow);
       border-color: var(--accent);
     }
 
@@ -102,7 +121,7 @@
 
     .card .desc {
       font-size: 0.88rem;
-      color: #444;
+      color: var(--desc);
       line-height: 1.5;
     }
 

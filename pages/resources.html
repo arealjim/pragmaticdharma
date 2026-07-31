@@ -5,6 +5,52 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pragmatic Dharma Resources</title>
     <style>
+        :root {
+            color-scheme: light;
+            --bg: #f5f5f5;
+            --fg: #333;
+            --header-bg: #2c3e50;
+            --header-fg: #fff;
+            --header-muted: #bdc3c7;
+            --section-bg: #fff;
+            --section-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            --heading: #2c3e50;
+            --subheading: #34495e;
+            --body-text: #555;
+            --accent: #3498db;
+            --accent-hover: #2980b9;
+            --link-btn-fg: #fff;
+            --border: #ddd;
+            --caption: #666;
+            --fallback-bg: #ecf0f1;
+            --card-bg: #fafafa;
+            --card-border: #eee;
+            --footer: #666;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                color-scheme: dark;
+                --bg: #16181d;
+                --fg: #d5d8dc;
+                --header-bg: #232f3e;
+                --header-fg: #eceff1;
+                --header-muted: #9aa7b1;
+                --section-bg: #1e2127;
+                --section-shadow: 0 2px 4px rgba(0,0,0,0.4);
+                --heading: #aecbeb;
+                --subheading: #9fb6c9;
+                --body-text: #b7bcc2;
+                --accent: #4aa3df;
+                --accent-hover: #5fb0e5;
+                --link-btn-fg: #10151a;
+                --border: #3a3f47;
+                --caption: #969ca4;
+                --fallback-bg: #262a31;
+                --card-bg: #23272e;
+                --card-border: #33383f;
+                --footer: #969ca4;
+            }
+        }
         * {
             margin: 0;
             padding: 0;
@@ -12,13 +58,13 @@
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: #f5f5f5;
-            color: #333;
+            background: var(--bg);
+            color: var(--fg);
             line-height: 1.6;
         }
         header {
-            background: #2c3e50;
-            color: white;
+            background: var(--header-bg);
+            color: var(--header-fg);
             padding: 2rem;
             text-align: center;
         }
@@ -29,7 +75,7 @@
             margin-bottom: 0.5rem;
         }
         header p {
-            color: #bdc3c7;
+            color: var(--header-muted);
             font-size: 1.1rem;
         }
         main {
@@ -38,32 +84,32 @@
             padding: 2rem;
         }
         section {
-            background: white;
+            background: var(--section-bg);
             border-radius: 8px;
             padding: 2rem;
             margin-bottom: 2rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: var(--section-shadow);
         }
         h2 {
             font-size: 1.5rem;
             font-weight: 500;
             margin-bottom: 1rem;
             padding-bottom: 0.5rem;
-            border-bottom: 2px solid #3498db;
-            color: #2c3e50;
+            border-bottom: 2px solid var(--accent);
+            color: var(--heading);
         }
         h3 {
             font-size: 1.1rem;
             font-weight: 500;
             margin: 1.5rem 0 0.75rem 0;
-            color: #34495e;
+            color: var(--subheading);
         }
         p {
             margin-bottom: 1rem;
-            color: #555;
+            color: var(--body-text);
         }
         a {
-            color: #3498db;
+            color: var(--accent);
             text-decoration: none;
         }
         a:hover {
@@ -71,15 +117,15 @@
         }
         .resource-link {
             display: inline-block;
-            background: #3498db;
-            color: white;
+            background: var(--accent);
+            color: var(--link-btn-fg);
             padding: 0.75rem 1.5rem;
             border-radius: 4px;
             margin: 0.5rem 0;
             transition: background 0.2s;
         }
         .resource-link:hover {
-            background: #2980b9;
+            background: var(--accent-hover);
             text-decoration: none;
         }
         .image-container {
@@ -89,12 +135,12 @@
         .image-container img {
             max-width: 100%;
             height: auto;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border);
             border-radius: 4px;
         }
         .image-caption {
             font-size: 0.9rem;
-            color: #666;
+            color: var(--caption);
             margin-top: 0.5rem;
             font-style: italic;
         }
@@ -104,11 +150,11 @@
         .pdf-container iframe {
             width: 100%;
             height: 600px;
-            border: 1px solid #ddd;
+            border: 1px solid var(--border);
             border-radius: 4px;
         }
         .pdf-fallback {
-            background: #ecf0f1;
+            background: var(--fallback-bg);
             padding: 1rem;
             border-radius: 4px;
             text-align: center;
@@ -119,8 +165,8 @@
             gap: 1.5rem;
         }
         .card {
-            background: #fafafa;
-            border: 1px solid #eee;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
             border-radius: 4px;
             padding: 1rem;
         }
@@ -132,14 +178,14 @@
         footer {
             text-align: center;
             padding: 2rem;
-            color: #666;
+            color: var(--footer);
             font-size: 0.9rem;
         }
     </style>
 </head>
 <body>
     <header>
-        <p style="margin-bottom: 0.5rem;"><a href="/" style="color: #bdc3c7; text-decoration: none;">&larr; Pragmatic Dharma</a></p>
+        <p style="margin-bottom: 0.5rem;"><a href="/" style="color: var(--header-muted); text-decoration: none;">&larr; Pragmatic Dharma</a></p>
         <h1>Meditation Maps & Resources</h1>
         <p>Curated references for contemplative practice</p>
     </header>

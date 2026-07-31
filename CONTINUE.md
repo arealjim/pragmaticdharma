@@ -1,8 +1,10 @@
 # Continue
 
-_Updated: 2026-07-19_
+_Updated: 2026-07-30_
 
 ## State
+
+**2026-07-30 overnight (Jim-approved): hub test coverage + small hardening — done, committed, NOT deployed.** 66/66 unit tests green (was 29). New: `test/signup.test.mjs`, `test/admin.test.mjs`, `test/refresh-session.test.mjs`, `test/logout.test.mjs`. Hardening: dead exports trimmed (export list is now documented test-only surface; `validateRedirectUrl` exported for tests), `"type": "module"` added (`test-auth.js` converted to ESM import; typeless-package warning gone), `GET /api/logout` **kept deliberately** — every sibling nav bar's Sign out is a live `<a href>` GET caller; deprecation documented in the router + tests, retire-for-real follow-up filed in TODO ## Later. **Real bug found + fixed in worker.js:** the global 20/hour signup backstop never fired in prod (D1 `datetime('now')` vs JS ISO `T`-separator string comparison was always false); now compared in SQL. That fix is not live until the next deploy — fold it into whatever deploys next. v2 slices 2–4 untouched (still gated on Jim's check-in). Details in TODO.md ## Later checked items.
 
 Platform hub is live and stable. v2 registry-driven rewrite: Slice 0 and Slice 1 both complete and deployed. Session-revocation Gap 1 (24h JWT TTL + lazy /login refresh) was deployed earlier the same day.
 

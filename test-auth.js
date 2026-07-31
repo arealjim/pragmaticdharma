@@ -10,7 +10,8 @@
  * Requires Node 18+ (for fetch, crypto.subtle).
  */
 
-const crypto = require('crypto');
+// ESM import since package.json gained "type": "module" (2026-07-30); was require().
+import crypto from 'node:crypto';
 
 // ---------------------------------------------------------------------------
 // JWT helpers

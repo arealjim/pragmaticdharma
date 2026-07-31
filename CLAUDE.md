@@ -103,9 +103,11 @@ For deferred items: prompt files live at `~/prompts/`. See the remediation track
 
 ## Testing
 
-**Unit tests** (local, no network): `npm test` — runs `test/*.test.mjs` under `node --test` against the real worker fetch handler, with an in-memory D1 (node:sqlite adapter, `test/fake-d1.mjs`) and stubbed outbound fetch. Loader hooks in `test/register-stubs.mjs` stub the wrangler text-module imports. Covers the auth flows: magic-link/code verify (atomic single-use), token hash-at-rest, logout revocation, retention sweep.
+**Unit tests** (local, no network): `npm test` — runs `test/*.test.mjs` under `node --test` against the real worker fetch handler, with an in-memory D1 (node:sqlite adapter, `test/fake-d1.mjs`) and stubbed outbound fetch. Loader hooks in `test/register-stubs.mjs` stub the wrangler text-module imports. Covers: magic-link/code verify (atomic single-use), token hash-at-rest, logout revocation (POST + deprecated GET), retention sweep, session-revocation/lazy-refresh, signup (rate limits, rejected-user cooldown, open-beta auto-approval), admin API (CSRF guard, authz, approve/reject, config allowlist), refresh-session, `validateRedirectUrl`, and the registry derivations.
 
 **Integration tests** (live): auth enforcement tests verify that all 6 subdomains correctly grant/deny access based on JWT `projects` claims.
+
+⚠️ **Known gap:** the live 45-check `test-auth.js` suite requires the production `JWT_SECRET_*` values, which are not available on dev machines (Secrets Store is write-only and most services have no local vault copies). Until that's solved, deploy safety rests on the unit suite + local `wrangler dev` and post-deploy smoke checks — the live matrix effectively can't be run.
 
 ```bash
 # Per-service JWT keys after Task #2 — one env var per service.

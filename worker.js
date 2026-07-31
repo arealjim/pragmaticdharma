@@ -281,6 +281,15 @@ export default {
       if (method === 'GET' && path === '/api/refresh-session') {
         return handleRefreshSession(request, env);
       }
+      // DEPRECATED but load-bearing: GET /api/logout mutates state (revokes the
+      // session row), which in principle belongs on POST only. It CANNOT be
+      // removed yet — the shared nav-bar "Sign out" is a plain <a href> (GET)
+      // baked into every deployed sub-project worker (astrology, discern,
+      // ego-assessment, psychic-shield, mind-reader, majordomo review-app, and
+      // this worker's own shared/nav-bar.html). Removing GET before every
+      // sibling re-vendors a POSTing nav bar would break Sign out fleet-wide.
+      // Worst case for keeping it: a third page can force a logout (nuisance,
+      // no data exposure). New callers must use POST.
       if (method === 'GET' && path === '/api/logout') {
         return handleLogout(request, env);
       }
@@ -326,11 +335,14 @@ async function handleSignup(request, env) {
     "INSERT INTO access_logs (project, ip_address, path, user_agent) VALUES ('platform-signup', ?, '/api/signup', ?)"
   ).bind(ip, request.headers.get('User-Agent') || null).run().catch(() => {});
 
-  // Global signup rate limit: max 20 per hour (kept as a backstop)
-  const oneHourAgo = new Date(Date.now() - 3600000).toISOString();
+  // Global signup rate limit: max 20 per hour (kept as a backstop).
+  // Compare in SQL: users.created_at is datetime('now') format
+  // ("YYYY-MM-DD HH:MM:SS"); the old JS toISOString() bound value had a 'T'
+  // separator, and since ' ' < 'T' the string comparison made the count
+  // always 0 — the backstop never fired (bug found by unit tests 2026-07-30).
   const signupCount = await env.DB.prepare(
-    'SELECT COUNT(*) as cnt FROM users WHERE created_at > ?'
-  ).bind(oneHourAgo).first();
+    "SELECT COUNT(*) as cnt FROM users WHERE created_at > datetime('now', '-1 hour')"
+  ).first();
   if (signupCount && signupCount.cnt >= 20) {
     return jsonResponse({ error: 'Too many signups. Please try again later.' }, 429);
   }
@@ -1405,4 +1417,9 @@ function redirectWithError(msg) {
 }
 
 // Export for use by sub-project workers and unit tests
-export { verifyJWT, verifyJWTForRefresh, getJWTFromCookie, signJWT, accessEmbed, formatLocation, notifyDiscord };
+// Exported for the unit tests only (test/*.test.mjs import the real handlers).
+// Sub-project Workers are separate Cloudflare deployments and cannot import
+// from this module — do not add exports for them here; shared verifier logic
+// lives in shared/auth-cloudflare.js. (Dead exports getJWTFromCookie,
+// accessEmbed, formatLocation, notifyDiscord removed 2026-07-30 — no importers.)
+export { verifyJWT, verifyJWTForRefresh, signJWT, validateRedirectUrl };

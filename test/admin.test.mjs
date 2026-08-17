@@ -96,6 +96,24 @@ test('no JWT → 401; non-admin JWT → 403', async () => {
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/admin/projects (v2 Slice 3 — admin.html fetches this instead of
+// carrying a hardcoded ALL_PROJECTS/PROJECT_LABELS literal)
+// ---------------------------------------------------------------------------
+
+test('projects: returns key + label for every known project, admin-gated like the rest', async () => {
+  const anon = await adminGet('projects', { jwt: null });
+  assert.equal(anon.status, 401);
+
+  const resp = await adminGet('projects');
+  assert.equal(resp.status, 200);
+  const body = await resp.json();
+  assert.equal(body.projects.length, KNOWN_PROJECTS.length);
+  for (const key of KNOWN_PROJECTS) {
+    assert.ok(body.projects.some(p => p.key === key), `missing project '${key}'`);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // approve / reject
 // ---------------------------------------------------------------------------
 

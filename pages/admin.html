@@ -147,8 +147,10 @@
       }
       loadConfig();
       loadProjectStats();
-      loadPending();
-      loadUsers();
+      loadProjects().then(function() {
+        loadPending();
+        loadUsers();
+      });
     })
     .catch(function() { window.location.href = '/login'; });
 
@@ -278,17 +280,25 @@
       });
   }
 
-  // NB: hardcoded, must stay in sync with projects.config.mjs PROJECTS (this is a
-  // static page that can't import the registry mjs). 'review' is the full ODF
-  // admin app (staff only — majordomo's own admin+allowlist gate is what actually
-  // restricts it). 'boardreview' is the separate least-privilege claim for board
-  // members' read-only mirror at boardreview.pragmaticdharma.org — since the
-  // 2026-07-27 hardening (todo-board card 5d077131052f) it no longer shares the
-  // 'review' claim.
-  var ALL_PROJECTS = ['health', 'shield', 'ego-assessment', 'mindreader', 'psychtools', 'astrology', 'practice', 'sentinel', 'bromnichord', 'discern', 'review', 'boardreview'];
-  var PROJECT_LABELS = { health: 'Health', shield: 'Shield', 'ego-assessment': 'Ego', mindreader: 'Mind Reader', psychtools: 'PsychTools', astrology: 'Astrology', practice: 'Practice', sentinel: 'Sentinel', bromnichord: 'Bromnichord', discern: 'Discern', review: 'Review (staff)', boardreview: 'Board Review' };
+  // v2 Slice 3: fetched from GET /api/admin/projects (registry-derived) instead
+  // of a hardcoded literal — this page can't import projects.config.mjs directly
+  // (static text-module page), so the worker serializes it at request time.
+  var ALL_PROJECTS = [];
+  var PROJECT_LABELS = {};
   var usersData = [];
   var healthUsers = {}; // email -> {id, opus_enabled}
+
+  function loadProjects() {
+    return fetch('/api/admin/projects', { credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var projects = data.projects || [];
+        ALL_PROJECTS = projects.map(function(p) { return p.key; });
+        PROJECT_LABELS = {};
+        projects.forEach(function(p) { PROJECT_LABELS[p.key] = p.label; });
+      })
+      .catch(function() { ALL_PROJECTS = []; PROJECT_LABELS = {}; });
+  }
 
   function loadUsers() {
     // Fetch health tracker users in parallel for opus badges

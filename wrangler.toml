@@ -44,14 +44,14 @@ store_id    = "626a023faf5e4be98729d2f4b9849f09"
 secret_name = "PRAGMATICDHARMA_RESEND_API_KEY"
 
 [[secrets_store_secrets]]
-binding     = "JWT_SECRET_HEALTH"
-store_id    = "626a023faf5e4be98729d2f4b9849f09"
-secret_name = "JWT_SECRET_HEALTH"
-
-[[secrets_store_secrets]]
 binding     = "JWT_SECRET_SHIELD"
 store_id    = "626a023faf5e4be98729d2f4b9849f09"
 secret_name = "JWT_SECRET_SHIELD"
+
+[[secrets_store_secrets]]
+binding     = "JWT_SECRET_HEALTH"
+store_id    = "626a023faf5e4be98729d2f4b9849f09"
+secret_name = "JWT_SECRET_HEALTH"
 
 [[secrets_store_secrets]]
 binding     = "JWT_SECRET_EGO_ASSESSMENT"
@@ -69,9 +69,9 @@ store_id    = "626a023faf5e4be98729d2f4b9849f09"
 secret_name = "JWT_SECRET_PSYCHTOOLS"
 
 [[secrets_store_secrets]]
-binding     = "JWT_SECRET_ASTROLOGY"
+binding     = "JWT_SECRET_DISCERN"
 store_id    = "626a023faf5e4be98729d2f4b9849f09"
-secret_name = "JWT_SECRET_ASTROLOGY"
+secret_name = "JWT_SECRET_DISCERN"
 
 [[secrets_store_secrets]]
 binding     = "JWT_SECRET_PRACTICE"
@@ -79,14 +79,14 @@ store_id    = "626a023faf5e4be98729d2f4b9849f09"
 secret_name = "JWT_SECRET_PRACTICE"
 
 [[secrets_store_secrets]]
+binding     = "JWT_SECRET_ASTROLOGY"
+store_id    = "626a023faf5e4be98729d2f4b9849f09"
+secret_name = "JWT_SECRET_ASTROLOGY"
+
+[[secrets_store_secrets]]
 binding     = "JWT_SECRET_BROMNICHORD"
 store_id    = "626a023faf5e4be98729d2f4b9849f09"
 secret_name = "JWT_SECRET_BROMNICHORD"
-
-[[secrets_store_secrets]]
-binding     = "JWT_SECRET_DISCERN"
-store_id    = "626a023faf5e4be98729d2f4b9849f09"
-secret_name = "JWT_SECRET_DISCERN"
 
 [[secrets_store_secrets]]
 binding     = "JWT_SECRET_REVIEW"

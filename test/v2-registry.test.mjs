@@ -15,9 +15,12 @@ import {
 
 test('KNOWN_PROJECTS has one entry per project', () => {
   assert.equal(KNOWN_PROJECTS.length, 12, 'expected 12 project keys');
+  // Order matches PROJECTS in projects.config.mjs, which as of v2 Slice 3
+  // is presentation order (index-card order for live projects) — nothing
+  // auth-relevant depends on array position.
   assert.deepStrictEqual(KNOWN_PROJECTS, [
-    'health', 'shield', 'ego-assessment', 'mindreader', 'psychtools',
-    'astrology', 'practice', 'sentinel', 'bromnichord', 'discern', 'review',
+    'shield', 'health', 'ego-assessment', 'mindreader', 'psychtools',
+    'discern', 'practice', 'astrology', 'sentinel', 'bromnichord', 'review',
     'boardreview',
   ]);
 });

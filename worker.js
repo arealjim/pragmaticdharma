@@ -40,6 +40,8 @@ import {
   HOST_TO_PROJECT,
   KID_TO_BINDING,
   CSP_CONNECT_SRC_HOSTS,
+  renderCards,
+  adminProjectsJSON,
 } from './src/registry.js';
 
 function validateRedirectUrl(url) {
@@ -200,7 +202,8 @@ export default {
     try {
       // Static pages
       if (method === 'GET' && (path === '/' || path === '')) {
-        const injected = await injectPlatformNav(INDEX_HTML, request, env, 'Pragmatic Dharma');
+        const withCards = INDEX_HTML.replace('{{cards}}', renderCards());
+        const injected = await injectPlatformNav(withCards, request, env, 'Pragmatic Dharma');
         return htmlResponse(injected);
       }
       if (method === 'GET' && path === '/resources') {
@@ -820,6 +823,12 @@ async function handleAdmin(request, env, path, method) {
   if (!payload || payload.role !== 'admin') return jsonResponse({ error: 'Forbidden' }, 403);
 
   const route = path.replace('/api/admin/', '');
+
+  // v2 Slice 3: admin.html fetches the project list + badge labels here
+  // instead of carrying a hardcoded literal that drifts from the registry.
+  if (method === 'GET' && route === 'projects') {
+    return jsonResponse({ projects: adminProjectsJSON() });
+  }
 
   if (method === 'GET' && route === 'pending') {
     const rows = await env.DB.prepare('SELECT email, name, note, created_at FROM users WHERE status = \'pending\' ORDER BY created_at DESC').all();

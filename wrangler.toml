@@ -27,25 +27,36 @@ crons = ["0 4 * * *"]
 # DISCORD_WEBHOOK_URL remains a plain Worker secret (set via
 # `wrangler secret put`) until rotation; it'll move to Secrets Store when
 # next rotated. The getSecret helper handles both.
-[[secrets_store_secrets]]
-binding     = "RESEND_API_KEY"
-store_id    = "626a023faf5e4be98729d2f4b9849f09"
-secret_name = "PRAGMATICDHARMA_RESEND_API_KEY"
-
+#
+# The block below is generated from projects.config.mjs by
+# scripts/gen-wrangler.mjs (v2 Slice 2) — do not hand-edit; run
+# `node scripts/gen-wrangler.mjs` after changing the registry, or let
+# `npm run deploy` do it (predeploy fails if this produces a diff).
+# --- BEGIN GENERATED SECRETS (gen-wrangler.mjs) ---
 [[secrets_store_secrets]]
 binding     = "JWT_SECRET_PRAGMATICDHARMA"
 store_id    = "626a023faf5e4be98729d2f4b9849f09"
 secret_name = "JWT_SECRET_PRAGMATICDHARMA"
 
 [[secrets_store_secrets]]
-binding     = "JWT_SECRET_EGO_ASSESSMENT"
+binding     = "RESEND_API_KEY"
 store_id    = "626a023faf5e4be98729d2f4b9849f09"
-secret_name = "JWT_SECRET_EGO_ASSESSMENT"
+secret_name = "PRAGMATICDHARMA_RESEND_API_KEY"
+
+[[secrets_store_secrets]]
+binding     = "JWT_SECRET_HEALTH"
+store_id    = "626a023faf5e4be98729d2f4b9849f09"
+secret_name = "JWT_SECRET_HEALTH"
 
 [[secrets_store_secrets]]
 binding     = "JWT_SECRET_SHIELD"
 store_id    = "626a023faf5e4be98729d2f4b9849f09"
 secret_name = "JWT_SECRET_SHIELD"
+
+[[secrets_store_secrets]]
+binding     = "JWT_SECRET_EGO_ASSESSMENT"
+store_id    = "626a023faf5e4be98729d2f4b9849f09"
+secret_name = "JWT_SECRET_EGO_ASSESSMENT"
 
 [[secrets_store_secrets]]
 binding     = "JWT_SECRET_MINDREADER"
@@ -68,11 +79,6 @@ store_id    = "626a023faf5e4be98729d2f4b9849f09"
 secret_name = "JWT_SECRET_PRACTICE"
 
 [[secrets_store_secrets]]
-binding     = "JWT_SECRET_HEALTH"
-store_id    = "626a023faf5e4be98729d2f4b9849f09"
-secret_name = "JWT_SECRET_HEALTH"
-
-[[secrets_store_secrets]]
 binding     = "JWT_SECRET_BROMNICHORD"
 store_id    = "626a023faf5e4be98729d2f4b9849f09"
 secret_name = "JWT_SECRET_BROMNICHORD"
@@ -86,6 +92,8 @@ secret_name = "JWT_SECRET_DISCERN"
 binding     = "JWT_SECRET_REVIEW"
 store_id    = "626a023faf5e4be98729d2f4b9849f09"
 secret_name = "JWT_SECRET_REVIEW"
+
+# --- END GENERATED SECRETS ---
 
 # D1 database — fill ID after running: wrangler d1 create pragmaticdharma
 [[d1_databases]]

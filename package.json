@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "gen:wrangler": "node scripts/gen-wrangler.mjs",
+    "predeploy": "node scripts/gen-wrangler.mjs && git diff --exit-code wrangler.toml || (echo 'wrangler.toml is out of sync with the registry — commit the regenerated file (see scripts/gen-wrangler.mjs) before deploying' >&2 && exit 1)",
     "deploy": "wrangler deploy",
     "test": "node --import ./test/register-stubs.mjs --test 'test/*.test.mjs'",
     "db:migrate": "wrangler d1 execute pragmaticdharma --remote --file schema.sql"

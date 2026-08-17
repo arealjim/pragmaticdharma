@@ -23,6 +23,9 @@ const VALID_STATUSES = new Set(['live', 'soon', 'hidden']);
     if ((p.status === 'live' || p.status === 'soon') && (!p.cardTitle || !p.cardDescription)) {
       throw new Error(`registry: project '${p.key}' has status '${p.status}' but no cardTitle/cardDescription`);
     }
+    if (!p.testProbe || !p.testProbe.startsWith('/')) {
+      throw new Error(`registry: project '${p.key}' testProbe must start with '/'`);
+    }
     if (p.kidBindingOverride && !p.kidBindingOverrideNotes) {
       throw new Error(`registry: kidBindingOverride on '${p.key}' requires kidBindingOverrideNotes`);
     }
@@ -101,6 +104,14 @@ export function publicProjects() {
 // All projects — for admin UI lists and the test-auth.js matrix.
 export function adminProjects() {
   return [...PROJECTS];
+}
+
+// Projects covered by test-auth.js's generic matrix ("has the project claim
+// -> 200"). Excludes customAuthTest projects (review, boardreview, sentinel),
+// which have gating beyond platform project membership and get a
+// hand-written policy test instead.
+export function testMatrixProjects() {
+  return PROJECTS.filter(p => !p.customAuthTest);
 }
 
 // ── rendering (index-page cards, admin project list) ────────────────────────

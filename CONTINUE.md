@@ -1,36 +1,35 @@
 # Continue
 
-_Updated: 2026-07-30_
+_Updated: 2026-08-17_
 
 ## State
 
-**2026-07-30 overnight (Jim-approved): hub test coverage + small hardening — done, committed, NOT deployed.** 66/66 unit tests green (was 29). New: `test/signup.test.mjs`, `test/admin.test.mjs`, `test/refresh-session.test.mjs`, `test/logout.test.mjs`. Hardening: dead exports trimmed (export list is now documented test-only surface; `validateRedirectUrl` exported for tests), `"type": "module"` added (`test-auth.js` converted to ESM import; typeless-package warning gone), `GET /api/logout` **kept deliberately** — every sibling nav bar's Sign out is a live `<a href>` GET caller; deprecation documented in the router + tests, retire-for-real follow-up filed in TODO ## Later. **Real bug found + fixed in worker.js:** the global 20/hour signup backstop never fired in prod (D1 `datetime('now')` vs JS ISO `T`-separator string comparison was always false); now compared in SQL. That fix is not live until the next deploy — fold it into whatever deploys next. v2 slices 2–4 untouched (still gated on Jim's check-in). Details in TODO.md ## Later checked items.
+**2026-08-17: v2 registry-driven rewrite Slices 2-4 — code-complete and unit-tested, committed, NOT deployed.** Jim's go-ahead for slices 2-4 (autonomous, slice-by-slice, no mid-build check-in; router stays zero-dep; the three security-cleanup scars stay descoped to standalone TODOs) landed 2026-08-17. This session ran in an isolated dispatch VM with **no npm registry egress and no Cloudflare credentials at all** — stricter than the Slice 1 session's gap (which could at least run `wrangler dev` locally). So all three slices are done as far as code + `npm test` can prove, but none of it has touched production. 78/78 unit tests green (was 66 at the top of this session).
 
-Platform hub is live and stable. v2 registry-driven rewrite: Slice 0 and Slice 1 both complete and deployed. Session-revocation Gap 1 (24h JWT TTL + lazy /login refresh) was deployed earlier the same day.
+- **Slice 2** (`b8c960e`): `scripts/gen-wrangler.mjs` regenerates wrangler.toml's `[[secrets_store_secrets]]` block from the registry; wired as `npm run predeploy`. Reordered the existing block to match generator output (a pure reorder — confirmed the binding/secret_name/store_id set is unchanged).
+- **Slice 3** (`8c05b54`): index.html's 9 live-project cards replaced with a `{{cards}}` placeholder rendered by `src/registry.js`'s `renderCards()`; new `GET /api/admin/projects`; admin.html fetches its project list instead of a hardcoded literal. Found and fixed two data-entry drifts in the registry while verifying against the live page: shield/health/sentinel were marked `status: 'hidden'` but are actually advertised (`'live'`); PROJECTS reordered to match index-page card order. One real (minor, cosmetic) page change: the "Meditation Resources" static card moved from 6th to 10th position, since it isn't a registry project and can't sit inside a single `{{cards}}` placeholder at its old interleaved spot.
+- **Slice 4** (latest commit): `test-auth.js`'s matrix + required-keys list generated from `testMatrixProjects()`. Found two more drifts: `practice` had a JWT key fetched but was never actually in the tested `sites` list (zero live coverage, silently); `health`/`ego-assessment`'s registry `testProbe` didn't match the endpoints actually probed — corrected to match. `./pd projects` and `./pd add-project <key>` added, manually verified end-to-end against a scratch copy (not the real repo). CLAUDE.md's Quick Reference/Testing/site-list updated to match current reality.
 
-**Slice 1 complete (deployed, version edefe64f):** `worker.js` now imports `KNOWN_PROJECTS`, `REDIRECT_ALLOWLIST`, `HOST_TO_PROJECT`, `KID_TO_BINDING`, `CSP_CONNECT_SRC_HOSTS` from `src/registry.js` instead of defining its own literals. Deleted the dead `getSigningKey` helper and the `v2-slice-0` freeze-export block. `test/v2-registry.test.mjs` rewritten to assert shape/values directly against the registry (the old worker-vs-registry equality check became trivially true once both sides shared one source). 29/29 unit tests green, local `wrangler dev` smoke test green, post-deploy production check confirmed the CSP `connect-src` header matches the registry-derived hosts exactly.
-
-**Known gap:** the live 45-check `test-auth.js` integration suite was NOT run before/after this deploy — this session had no access to the production `JWT_SECRET_*` values (Cloudflare Secrets Store is write-only; most services' keys aren't mirrored in the local vault). Deploy safety instead rested on: the Slice-0 equality tests (now folded into Slice 1's registry-shape tests), a clean `node --check`, a local `wrangler dev` smoke test, and a post-deploy production smoke test (CSP header, redirect-allowlist behavior, unauthenticated gate responses on all subdomains). If Jim wants the full JWT suite run, it needs a session/machine with the `JWT_SECRET_*` values, or Jim providing them.
-
-**Go-ahead shape:** Jim wanted a check-in after Slice 1's flip deploy before continuing slices 2–4. That check-in is now due.
+**New gap surfaced by this work** (not introduced by it — the old hand-maintained matrix had the same hole, just silently): **sentinel has zero live-suite coverage.** It's `customAuthTest: true` (admin-email allowlist enforced in sentinel-web, invisible to the platform registry) so it can't join the generic matrix as-is; needs a hand-written policy test like `testReviewSite`/`testBoardReviewSite`.
 
 ## Next step
 
-Wait for Jim's go-ahead, then continue with:
-- Slice 2 — wrangler.toml codegen (scripts/gen-wrangler.mjs; no binding changes)
-- Slice 3 — pages + admin from registry ({{cards}} substitution; GET /api/admin/projects)
-- Slice 4 — tests + CLI (test-auth.js matrix generated from registry; `pd projects`; `pd add-project`)
-- Slice 5 (optional) — module split into src/ layout
+**Deploy Slices 2-4 together**, from a session with Cloudflare credentials:
+1. `npm run deploy` (predeploy regenerates + checks wrangler.toml is clean, then `wrangler deploy`).
+2. Smoke-check: index page cards render correctly (should look identical to before except the Resources card's new position), `/admin` project badges load from `/api/admin/projects`, `./pd projects` output looks right.
+3. Run the live `test-auth.js` suite if the JWT secrets are reachable from that session (they haven't been reachable from any session so far — flag to Jim if this is still blocked).
+4. Then either close out v2 (Slice 5 — module split — is optional and can be deferred indefinitely) or pick it up.
+5. Separately: write sentinel's live-suite policy test once its exact allowlist behavior can be verified against the deployed site.
 
 ## Prompt
 
 ```
 Work in ~/workspace/pragmaticdharma. Read TODO.md and CONTINUE.md.
-Slice 1 is done and deployed. If Jim has given the go-ahead, continue with
-v2 Slice 2 — wrangler.toml codegen: write scripts/gen-wrangler.mjs that
-generates wrangler.toml's secrets_store_secrets bindings from
-projects.config.mjs (JWT_SECRET_<KID> entries), diff against the current
-wrangler.toml to confirm no binding changes, and wire it as a `predeploy`
-or documented manual step. No binding changes should occur in this slice —
-it's establishing the registry as the single source for config generation.
+v2 registry rewrite Slices 0-4 are all code-complete, unit-tested, and
+committed on main, but Slices 2-4 have never been deployed (built in
+sandboxes with no Cloudflare credentials). From a session that HAS
+Cloudflare Secrets Store access: run `npm run deploy`, smoke-check the
+index page + /admin page + `./pd projects`, and if the JWT_SECRET_* values
+are reachable, run `node test-auth.js` and report the result. Then decide
+with Jim whether to pick up optional Slice 5 (module split) or close out v2.
 ```

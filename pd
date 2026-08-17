@@ -59,6 +59,10 @@ Commands:
   beta on|off     — Toggle open beta mode
   logs [PROJECT] [N] — Show recent access logs (default: all, 50)
   config          — Show all config values
+  projects        — List all registered projects (key, host, gate, status)
+  add-project KEY [--subdomain SUB] [--label "Name"] [--gate worker-gate|api-gate]
+                  [--admin-connect] [--test-probe PATH]
+                  — Onboard a new project (see docs/v2-registry-schema.md)
 EOF
     exit 1
 }
@@ -130,6 +134,13 @@ case "$1" in
         ;;
     config)
         run_sql "SELECT key, value, updated_at FROM config ORDER BY key;"
+        ;;
+    projects)
+        node "$SCRIPT_DIR/scripts/list-projects.mjs"
+        ;;
+    add-project)
+        shift
+        node "$SCRIPT_DIR/scripts/add-project.mjs" "$@"
         ;;
     *)
         usage

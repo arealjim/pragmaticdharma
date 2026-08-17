@@ -12,6 +12,12 @@
 
 // ESM import since package.json gained "type": "module" (2026-07-30); was require().
 import crypto from 'node:crypto';
+// v2 Slice 4: the generic matrix (sites[]) and the per-service JWT keys are
+// generated from the registry instead of two hand-maintained lists that can
+// silently drift apart from projects.config.mjs (and from each other — see
+// the git history for a project that was fetched a key for but never
+// tested). testProbe/gate/kid/label all come from one place now.
+import { testMatrixProjects, KID_TO_BINDING } from './src/registry.js';
 
 // ---------------------------------------------------------------------------
 // JWT helpers
@@ -332,23 +338,31 @@ async function testEgoCriticals() {
 // Main
 // ---------------------------------------------------------------------------
 
-// Read each per-service JWT key from env, falling back to JWT_SECRET for any
-// site whose key isn't explicitly set. Test JWTs need the same key the site
-// itself verifies with (per-service post-Task #2).
+// Generic matrix, derived from the registry (v2 Slice 4). testMatrixProjects()
+// already excludes review/boardreview/sentinel (customAuthTest: true — gating
+// beyond platform project membership, tested separately below).
+const sites = testMatrixProjects().map(p => ({
+  name: p.label,
+  url: `https://${p.subdomain}.pragmaticdharma.org${p.testProbe}`,
+  projectKey: p.key,
+  authStyle: p.gate,
+  kid: p.kid,
+}));
+
+// Per-service JWT keys, read from env by the Secrets Store binding name the
+// registry says that kid verifies with. Test JWTs need the same key the site
+// itself verifies with (per-service post-Task #2). 'review' is included even
+// though it's excluded from `sites` — testReviewSite/testBoardReviewSite both
+// need it (boardreview shares the binding via kidBindingOverride).
+const REQUIRED_KIDS = [...new Set([...sites.map(s => s.kid), 'review'])];
+
 function readKeys() {
   const fallback = process.env.JWT_SECRET;
-  return {
-    shield:           process.env.JWT_SECRET_SHIELD          || fallback,
-    mindreader:       process.env.JWT_SECRET_MINDREADER      || fallback,
-    psychtools:       process.env.JWT_SECRET_PSYCHTOOLS      || fallback,
-    astrology:        process.env.JWT_SECRET_ASTROLOGY       || fallback,
-    'ego-assessment': process.env.JWT_SECRET_EGO_ASSESSMENT  || fallback,
-    practice:         process.env.JWT_SECRET_PRACTICE        || fallback,
-    health:           process.env.JWT_SECRET_HEALTH          || fallback,
-    bromnichord:      process.env.JWT_SECRET_BROMNICHORD     || fallback,
-    discern:          process.env.JWT_SECRET_DISCERN         || fallback,
-    review:           process.env.JWT_SECRET_REVIEW          || fallback,
-  };
+  const keys = {};
+  for (const kid of REQUIRED_KIDS) {
+    keys[kid] = process.env[KID_TO_BINDING[kid]] || fallback;
+  }
+  return keys;
 }
 
 async function main() {
@@ -356,25 +370,13 @@ async function main() {
   const allKeysPresent = Object.values(keys).every(k => !!k);
   if (!allKeysPresent) {
     console.error(`${COLORS.red}Error: per-service JWT keys required. Set:${COLORS.reset}`);
-    console.error('  JWT_SECRET_SHIELD, JWT_SECRET_MINDREADER, JWT_SECRET_PSYCHTOOLS,');
-    console.error('  JWT_SECRET_ASTROLOGY, JWT_SECRET_EGO_ASSESSMENT, JWT_SECRET_PRACTICE,');
-    console.error('  JWT_SECRET_HEALTH, JWT_SECRET_BROMNICHORD, JWT_SECRET_DISCERN (or JWT_SECRET as a single fallback for all).');
+    console.error(`  ${REQUIRED_KIDS.map(kid => KID_TO_BINDING[kid]).join(', ')}`);
+    console.error('  (or JWT_SECRET as a single fallback for all).');
     process.exit(2);
   }
 
   console.log(`${COLORS.bold}Auth Enforcement Tests${COLORS.reset}`);
-  console.log(`${COLORS.dim}Testing 8 sites × 7 scenarios + 6 review-policy tests + 5 board-review-policy tests + 3 ego critical-endpoint tests${COLORS.reset}`);
-
-  const sites = [
-    { name: 'Psychic Shield', url: 'https://shield.pragmaticdharma.org/',                   projectKey: 'shield',          authStyle: 'worker-gate', kid: 'shield' },
-    { name: 'Mind Reader',    url: 'https://mindreader.pragmaticdharma.org/',               projectKey: 'mindreader',      authStyle: 'worker-gate', kid: 'mindreader' },
-    { name: 'PsychTools',     url: 'https://psychtools.pragmaticdharma.org/',               projectKey: 'psychtools',      authStyle: 'worker-gate', kid: 'psychtools' },
-    { name: 'Bromnichord',    url: 'https://bromnichord.pragmaticdharma.org/',              projectKey: 'bromnichord',     authStyle: 'worker-gate', kid: 'bromnichord' },
-    { name: 'Discern',        url: 'https://discern.pragmaticdharma.org/',                  projectKey: 'discern',         authStyle: 'worker-gate', kid: 'discern' },
-    { name: 'Transit Viewer', url: 'https://astrology.pragmaticdharma.org/',                projectKey: 'astrology',       authStyle: 'worker-gate', kid: 'astrology' },
-    { name: 'Ego Assessment', url: 'https://psychology.pragmaticdharma.org/api/profile',    projectKey: 'ego-assessment',  authStyle: 'api-gate',    kid: 'ego-assessment' },
-    { name: 'Health Tracker', url: 'https://health.pragmaticdharma.org/api/mood/trends',    projectKey: 'health',          authStyle: 'api-gate',    kid: 'health' },
-  ];
+  console.log(`${COLORS.dim}Testing ${sites.length} sites × 7 scenarios + 6 review-policy tests + 5 board-review-policy tests + 3 ego critical-endpoint tests${COLORS.reset}`);
 
   let totalPassed = 0;
   let totalFailed = 0;

@@ -22,7 +22,13 @@ npm run db:migrate       # Apply schema.sql to remote D1
 ./pd beta on|off         # Toggle open beta
 ./pd logs [PROJECT] [N]  # Show access logs
 ./pd config              # Show config values
+./pd projects            # List all registered projects (key, host, gate, status)
+./pd add-project KEY     # Onboard a new project (see docs/v2-registry-schema.md)
 ```
+
+### Adding a new sub-project
+
+`./pd add-project <key> [--subdomain SUB] [--label "Name"] [--gate worker-gate|api-gate] [--admin-connect] [--test-probe PATH]` does steps 1-3 automatically (appends a `status: 'soon'` entry to `projects.config.mjs`, regenerates `wrangler.toml`'s secrets block), attempts step 4 (Secrets Store secret creation — the beta CLI has failed before, so it always also prints the dashboard fallback + the generated value), then prints the remaining manual checklist (DNS/route, sub-worker JWT verification snippet, granting yourself access, `node test-auth.js --only <key>`, `npm run deploy`, flipping `status` to `'live'`). Full flow: `docs/v2-registry-schema.md`.
 
 ## Architecture
 
@@ -99,25 +105,23 @@ reviews/
 
 ## Testing
 
-**Unit tests** (local, no network): `npm test` — runs `test/*.test.mjs` under `node --test` against the real worker fetch handler, with an in-memory D1 (node:sqlite adapter, `test/fake-d1.mjs`) and stubbed outbound fetch. Loader hooks in `test/register-stubs.mjs` stub the wrangler text-module imports. Covers: magic-link/code verify (atomic single-use), token hash-at-rest, logout revocation (POST + deprecated GET), retention sweep, session-revocation/lazy-refresh, signup (rate limits, rejected-user cooldown, open-beta auto-approval), admin API (CSRF guard, authz, approve/reject, config allowlist), refresh-session, `validateRedirectUrl`, and the registry derivations.
+**Unit tests** (local, no network): `npm test` — runs `test/*.test.mjs` under `node --test` against the real worker fetch handler, with an in-memory D1 (node:sqlite adapter, `test/fake-d1.mjs`) and stubbed outbound fetch. Loader hooks in `test/register-stubs.mjs` stub the wrangler text-module imports. Covers: magic-link/code verify (atomic single-use), token hash-at-rest, logout revocation (POST + deprecated GET), retention sweep, session-revocation/lazy-refresh, signup (rate limits, rejected-user cooldown, open-beta auto-approval), admin API (CSRF guard, authz, approve/reject, config allowlist, `GET /api/admin/projects`), refresh-session, `validateRedirectUrl`, the registry derivations, the registry-rendered index cards (byte-compared against the pre-v2 static markup), and the `wrangler.toml` codegen (`scripts/gen-wrangler.mjs`).
 
-**Integration tests** (live): auth enforcement tests verify that all 6 subdomains correctly grant/deny access based on JWT `projects` claims.
+**Integration tests** (live): `test-auth.js`'s generic matrix (`sites`) and required JWT keys are generated from the registry (`testMatrixProjects()` — every project except `review`/`boardreview`/`sentinel`, which have `customAuthTest: true` and their own hand-written policy tests below them in the file, since they're gated by their own sub-worker's admin-role/email-allowlist logic beyond what the platform's JWT `projects` claim can express).
 
-⚠️ **Known gap:** the live 45-check `test-auth.js` suite requires the production `JWT_SECRET_*` values, which are not available on dev machines (Secrets Store is write-only and most services have no local vault copies). Until that's solved, deploy safety rests on the unit suite + local `wrangler dev` and post-deploy smoke checks — the live matrix effectively can't be run.
+⚠️ **Known gap:** the live suite requires the production `JWT_SECRET_*` values, which are not available on dev machines (Secrets Store is write-only and most services have no local vault copies). Until that's solved, deploy safety rests on the unit suite + local `wrangler dev` and post-deploy smoke checks — the live matrix effectively can't be run. **Also:** `sentinel` has no live-suite coverage at all yet — it needs a hand-written policy test (like `testReviewSite`/`testBoardReviewSite`) once someone can verify its exact admin-email-allowlist behavior; tracked in TODO.md.
 
 ```bash
-# Per-service JWT keys after Task #2 — one env var per service.
-# Or use a single JWT_SECRET as a fallback for all (pre-Task-#2 mode).
-JWT_SECRET_SHIELD=… JWT_SECRET_MINDREADER=… JWT_SECRET_PSYCHTOOLS=… \
-JWT_SECRET_ASTROLOGY=… JWT_SECRET_EGO_ASSESSMENT=… \
-JWT_SECRET_PRACTICE=… JWT_SECRET_HEALTH=… \
+# Per-service JWT keys — the error message from a bare `node test-auth.js`
+# lists exactly which ones are required (derived from the registry).
+# Or use a single JWT_SECRET as a fallback for all.
 node test-auth.js
 ```
 
-Tests 7 scenarios per subdomain × 6 sites = 42 + 3 ego critical-endpoint tests = 45 total.
+Tests 7 scenarios × the registry's non-custom-auth-test project count (9 as of 2026-08-17) = 63, + 6 review-policy tests + 5 board-review-policy tests + 3 ego critical-endpoint tests = 77 total. This count moves as projects are added — `./pd add-project` keeps it correct without a hand-edit here.
 
-Two auth styles are tested:
-- **worker-gate** (shield, mindreader, psychtools, astrology, practice): unauthenticated → 302 redirect, wrong project → 302 to `/api/refresh-session` (re-issues JWT), then 403 if still denied. Tests accept either 302 or 403 for the project-denied case.
+Two auth styles are tested — which one applies to a project is its `gate` field in `projects.config.mjs`:
+- **worker-gate** (shield, mindreader, psychtools, discern, practice, astrology, bromnichord — plus sentinel/review/boardreview, tested separately, custom policy): unauthenticated → 302 redirect, wrong project → 302 to `/api/refresh-session` (re-issues JWT), then 403 if still denied. Tests accept either 302 or 403 for the project-denied case.
 - **api-gate** (ego-assessment, health): all auth failures → 401 (project-denied = unauthenticated at API level)
 
 ## Code Conventions

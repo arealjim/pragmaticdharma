@@ -20,6 +20,11 @@
 //   cardDescription — index-page card <p> text (raw HTML — may contain entities like
 //                    &mdash;, rendered unescaped) — required when status is 'live' or 'soon'
 //   testProbe      — path that must return 200 when authed (used by test-auth.js in slice 4)
+//   customAuthTest — true if this project has gating beyond platform project
+//                    membership (admin role, email allowlist — enforced by the
+//                    sub-project's OWN worker, invisible to this registry) and
+//                    so needs a hand-written policy test in test-auth.js instead
+//                    of the generic "has the project claim -> 200" matrix
 //
 // PROJECTS order also drives index-page card order (for live/soon projects) and
 // wrangler.toml's generated secrets block order (scripts/gen-wrangler.mjs) — it's
@@ -56,7 +61,9 @@ export const PROJECTS = [
     adminLabel:   'Health',
     cardTitle:       'Health Tracker',
     cardDescription: 'Traditional Chinese Medicine body mapping and symptom tracking. Log daily observations and track patterns over time.',
-    testProbe:    '/',
+    // v2 Slice 4: was '/' — corrected to match the endpoint test-auth.js has
+    // actually been probing (an authed-only API route; '/' may not require auth).
+    testProbe:    '/api/mood/trends',
   },
 
   // ── ego-assessment ───────────────────────────────────────────────────────────
@@ -71,7 +78,9 @@ export const PROJECTS = [
     adminConnect: true,     // admin.html cross-fetches /api/* on this service
     label:        'Ego Assessment',
     adminLabel:   'Ego',
-    testProbe:    '/api/assess',
+    // v2 Slice 4: was '/api/assess' — corrected to match the endpoint
+    // test-auth.js has actually been probing.
+    testProbe:    '/api/profile',
   },
 
   // ── mindreader ───────────────────────────────────────────────────────────────
@@ -176,6 +185,13 @@ export const PROJECTS = [
     cardTitle:       'Sentinel',
     cardDescription: 'Preparedness scenarios, predictions, and daily assessment.',
     testProbe:              '/',
+    // v2 Slice 4: sentinel-web enforces an admin-email allowlist on top of the
+    // platform's project-membership check (its own worker, invisible to this
+    // registry) — the generic "has the project claim -> 200" matrix doesn't
+    // hold. No live-suite coverage exists for sentinel yet; needs a
+    // hand-written policy test analogous to testReviewSite/testBoardReviewSite
+    // once someone can verify its exact allowlist behavior. Filed as a TODO.
+    customAuthTest:         true,
   },
 
   // ── bromnichord ──────────────────────────────────────────────────────────────
@@ -209,6 +225,9 @@ export const PROJECTS = [
     label:        'Review',
     adminLabel:   'Review (staff)',
     testProbe:    '/',
+    // Admin role + email allowlist beyond project membership — has its own
+    // policy test, testReviewSite() in test-auth.js.
+    customAuthTest: true,
   },
 
   // ── boardreview ──────────────────────────────────────────────────────────────
@@ -232,5 +251,8 @@ export const PROJECTS = [
     label:                   'Board Review',
     adminLabel:              'Board Review',
     testProbe:               '/',
+    // Board-email allowlist beyond project membership — has its own policy
+    // test, testBoardReviewSite() in test-auth.js.
+    customAuthTest:          true,
   },
 ];

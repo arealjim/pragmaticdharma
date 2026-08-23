@@ -1,35 +1,34 @@
 # Continue
 
-_Updated: 2026-08-17_
+_Updated: 2026-08-23_
 
 ## State
 
-**2026-08-17: v2 registry-driven rewrite Slices 2-4 — code-complete and unit-tested, committed, NOT deployed.** Jim's go-ahead for slices 2-4 (autonomous, slice-by-slice, no mid-build check-in; router stays zero-dep; the three security-cleanup scars stay descoped to standalone TODOs) landed 2026-08-17. This session ran in an isolated dispatch VM with **no npm registry egress and no Cloudflare credentials at all** — stricter than the Slice 1 session's gap (which could at least run `wrangler dev` locally). So all three slices are done as far as code + `npm test` can prove, but none of it has touched production. 78/78 unit tests green (was 66 at the top of this session).
+**2026-08-23: v2 registry-driven rewrite Slices 2-4 — DEPLOYED.** This session had Cloudflare Secrets Store access (confirmed via `wrangler whoami`). `npm run deploy` succeeded — predeploy codegen reported `wrangler.toml` already up to date, `wrangler deploy` uploaded cleanly. Live version `6671728e-b555-438f-8102-ff3f3665bd97`.
 
-- **Slice 2** (`b8c960e`): `scripts/gen-wrangler.mjs` regenerates wrangler.toml's `[[secrets_store_secrets]]` block from the registry; wired as `npm run predeploy`. Reordered the existing block to match generator output (a pure reorder — confirmed the binding/secret_name/store_id set is unchanged).
-- **Slice 3** (`8c05b54`): index.html's 9 live-project cards replaced with a `{{cards}}` placeholder rendered by `src/registry.js`'s `renderCards()`; new `GET /api/admin/projects`; admin.html fetches its project list instead of a hardcoded literal. Found and fixed two data-entry drifts in the registry while verifying against the live page: shield/health/sentinel were marked `status: 'hidden'` but are actually advertised (`'live'`); PROJECTS reordered to match index-page card order. One real (minor, cosmetic) page change: the "Meditation Resources" static card moved from 6th to 10th position, since it isn't a registry project and can't sit inside a single `{{cards}}` placeholder at its old interleaved spot.
-- **Slice 4** (latest commit): `test-auth.js`'s matrix + required-keys list generated from `testMatrixProjects()`. Found two more drifts: `practice` had a JWT key fetched but was never actually in the tested `sites` list (zero live coverage, silently); `health`/`ego-assessment`'s registry `testProbe` didn't match the endpoints actually probed — corrected to match. `./pd projects` and `./pd add-project <key>` added, manually verified end-to-end against a scratch copy (not the real repo). CLAUDE.md's Quick Reference/Testing/site-list updated to match current reality.
+Smoke checks, all green:
+- Index page: 200, all 9 live project cards render (shield, health, mindreader, psychtools, discern, practice, astrology, sentinel, bromnichord), "Meditation Resources" static card now in position 10 (before Retreat Finder) — the accepted Slice 3 cosmetic change, confirmed live.
+- `GET /api/admin/projects` returns 401 unauthenticated (correct — admin-gated); `/admin` page's client JS fetches from it (Slice 3 wiring). Could not verify authenticated badge rendering in-browser — no admin session cookie reachable from this session.
+- `./pd projects` output matches the registry table in CLAUDE.md (12 projects, correct gate/status/customAuthTest columns).
+- `npm test` post-deploy: 78/78 green.
 
-**New gap surfaced by this work** (not introduced by it — the old hand-maintained matrix had the same hole, just silently): **sentinel has zero live-suite coverage.** It's `customAuthTest: true` (admin-email allowlist enforced in sentinel-web, invisible to the platform registry) so it can't join the generic matrix as-is; needs a hand-written policy test like `testReviewSite`/`testBoardReviewSite`.
+**JWT-24h / no-daily-magic-link condition (Jim's approval condition from 2026-07-17) — confirmed satisfied:** `JWT_TTL_SECONDS = 86400` (worker.js:1001). D1 `sessions` rows live 30 days (worker.js:670, 1132); `pd_session` cookie Max-Age is 2592000s / 30d (worker.js:1163). When the JWT's 24h `exp` passes but the underlying session is still valid, `/login` silently re-mints a fresh JWT via the lazy-refresh path (`verifyJWTForRefresh` → `handleRefreshSession`, worker.js:214-253, 726-793) — no new magic-link email is sent. Users only get prompted for a fresh magic link once the 30-day session itself expires or is revoked.
+
+**Live `test-auth.js` suite still could not run.** Confirmed this session, definitively: `wrangler secrets-store secret get <store> --secret-id <id> --remote` returns only metadata (name/id/store/scopes/status/timestamps) — never the secret value. Cloudflare Secrets Store is write-only by design; there is no way to read `JWT_SECRET_*` values back out via the CLI. No local vault copies exist either. This isn't a session-capability gap that a future session with "more access" can close — it's a structural property of the Secrets Store product. Deploy safety continues to rest on the unit suite (78/78) + these live smoke checks, not the live auth matrix. If exercising the full live matrix ever becomes a real requirement, the fix would be either (a) generating a *second* throwaway set of JWT secrets whose values are captured locally at creation time for test use only, or (b) building a `/api/debug/verify-jwt`-style admin-only endpoint — both are new work, not something "credentials" alone unlock.
 
 ## Next step
 
-**Deploy Slices 2-4 together**, from a session with Cloudflare credentials:
-1. `npm run deploy` (predeploy regenerates + checks wrangler.toml is clean, then `wrangler deploy`).
-2. Smoke-check: index page cards render correctly (should look identical to before except the Resources card's new position), `/admin` project badges load from `/api/admin/projects`, `./pd projects` output looks right.
-3. Run the live `test-auth.js` suite if the JWT secrets are reachable from that session (they haven't been reachable from any session so far — flag to Jim if this is still blocked).
-4. Then either close out v2 (Slice 5 — module split — is optional and can be deferred indefinitely) or pick it up.
-5. Separately: write sentinel's live-suite policy test once its exact allowlist behavior can be verified against the deployed site.
+v2 rewrite (Slices 0-4) is now fully deployed. Remaining open items, none blocking:
+1. Slice 5 (optional, module split into `src/`) — can be picked up anytime or deferred indefinitely.
+2. Write sentinel's hand-written live-suite policy test (`testSentinelSite`, alongside `testReviewSite`/`testBoardReviewSite`) — needs someone to verify its exact admin-email-allowlist behavior against the live site first.
+3. If the live `test-auth.js` gap ever needs closing for real, decide between the two options above with Jim first — both add new attack surface (a second secret set, or a debug endpoint) that needs a security look before building.
 
 ## Prompt
 
 ```
 Work in ~/workspace/pragmaticdharma. Read TODO.md and CONTINUE.md.
-v2 registry rewrite Slices 0-4 are all code-complete, unit-tested, and
-committed on main, but Slices 2-4 have never been deployed (built in
-sandboxes with no Cloudflare credentials). From a session that HAS
-Cloudflare Secrets Store access: run `npm run deploy`, smoke-check the
-index page + /admin page + `./pd projects`, and if the JWT_SECRET_* values
-are reachable, run `node test-auth.js` and report the result. Then decide
-with Jim whether to pick up optional Slice 5 (module split) or close out v2.
+v2 registry rewrite (Slices 0-4) is fully deployed as of 2026-08-23. Remaining
+optional work: Slice 5 (module split, low priority) and sentinel's live-suite
+policy test (needs live-site verification of its admin-email allowlist first).
+Check TODO.md ## Later for the current priority order.
 ```

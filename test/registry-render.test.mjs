@@ -11,17 +11,11 @@ import assert from 'node:assert/strict';
 
 import { renderCards, adminProjectsJSON } from '../src/registry.js';
 
-const EXPECTED_CARDS = [
-  ['shield', 'Shield', 'Automated daily intelligence briefing. Collects news, Reddit discussions, market data, and conflict reports from 33+ sources, synthesized by AI into a security-focused morning brief.'],
-  ['health', 'Health Tracker', 'Traditional Chinese Medicine body mapping and symptom tracking. Log daily observations and track patterns over time.'],
-  ['mindreader', 'Mind Reader', 'Gaze-guided therapeutic tool. Tracks emotions, heart rate, and physiological signals via webcam while guiding your gaze across the screen.'],
-  ['psychtools', 'PsychTools', 'Interactive DBT skills practice suite. 35 tools across mindfulness, interpersonal effectiveness, emotion regulation, and distress tolerance.'],
-  ['discern', 'Discern', 'Calibration training game. Judge claims as true or false, state your confidence, and see how well your certainty tracks reality &mdash; trains spotting misinformation without sliding into blanket cynicism.'],
-  ['practice', 'Practice Hub', 'Cycle-aware life management. Tasks and goals aligned with TCM organ clock, lunar phases, solar terms, and astrological transits. Natural language task entry with Five Element energy tagging.'],
-  ['astrology', 'Transit Viewer', 'Personalized astrological transit timeline. Enter your birth data, see a Gantt-chart of upcoming planetary transits, and get AI-powered interpretations and interactive chat.'],
-  ['sentinel', 'Sentinel', 'Preparedness scenarios, predictions, and daily assessment.'],
-  ['bromnichord', 'Bromnichord', 'Browser omnichord with 8-bit chiptune voices. Pick chords on a circle-of-fifths wheel, set arpeggios, and strum a 10-segment light beam — all wrapped in psychedelic audio-reactive visuals.'],
-];
+// 2026-09-29 (Jim): every registry project is hidden — the index shows only
+// the static Psyche / Meditation Resources / Retreat Finder cards. Restoring a
+// project's card = set its status back to 'live' and re-add its row here, e.g.
+//   ['shield', 'Shield', '<cardDescription from projects.config.mjs>'],
+const EXPECTED_CARDS = [];
 
 function cardHtml(subdomain, title, desc) {
   return `  <a class="card-link" href="https://${subdomain}.pragmaticdharma.org">\n` +
@@ -33,7 +27,7 @@ test('renderCards() reproduces the frozen pre-Slice-3 card markup byte-for-byte'
   assert.equal(renderCards(), expected);
 });
 
-test('renderCards() emits exactly 9 cards, in index-page order', () => {
+test('renderCards() emits exactly EXPECTED_CARDS.length cards, in index-page order', () => {
   const matches = [...renderCards().matchAll(/href="https:\/\/([a-z]+)\.pragmaticdharma\.org"/g)].map(m => m[1]);
   assert.deepStrictEqual(matches, EXPECTED_CARDS.map(([sd]) => sd));
 });

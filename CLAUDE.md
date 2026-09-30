@@ -41,6 +41,8 @@ Full login sequence, JWT-verification sequence, D1 retention schedule, and failu
 
 ## Sub-Projects
 
+> **2026-09-29: most sub-projects are OFFLINE** (Jim's decision) — only shield, sentinel, review, boardreview still serve; the index lists Psyche / Meditation Resources / Retreat Finder only. Deploying a sub-project repo re-publishes it. Details + restore: `docs/offline-2026-09-29.md`. The table below describes the architecture, not current availability.
+
 All 12 sub-projects are Cloudflare Workers (Pages migration complete 2026-04-25; discern added 2026-06-12; review added 2026-07-17; boardreview split out 2026-07-27). Each verifies JWTs with its own per-service key (`kid` claim selects the right key). **The registry source of truth is `projects.config.mjs`** (validated + derived by `src/registry.js`) — check it before trusting this table.
 
 | Subdomain | Worker | Auth Style | Notes |

@@ -47,6 +47,7 @@
   <div class="form-box" id="step-email">
     <label for="email">Email</label>
     <input type="email" id="email" placeholder="you@example.com" autocomplete="email" autofocus>
+    <div id="ts-widget" data-sitekey="{{TURNSTILE_SITE_KEY}}" style="margin-bottom:1rem"></div>
     <button id="btn-email" onclick="sendCode()">Send Code</button>
     <div id="msg-email" class="msg"></div>
   </div>
@@ -71,6 +72,30 @@
 <script>
 var userEmail = '';
 
+// Turnstile bot check: the worker fills data-sitekey when it is configured;
+// empty (or the raw placeholder, under unit tests) = no widget, no token.
+var tsSiteKey = document.getElementById('ts-widget').getAttribute('data-sitekey') || '';
+if (tsSiteKey.indexOf('{{') === 0) tsSiteKey = '';
+var tsToken = '', tsWidgetId = null;
+function tsReady() {
+  tsWidgetId = turnstile.render('#ts-widget', {
+    sitekey: tsSiteKey,
+    callback: function(t) { tsToken = t; },
+    'expired-callback': function() { tsToken = ''; },
+    'error-callback': function() { tsToken = ''; }
+  });
+}
+if (tsSiteKey) {
+  var tsScript = document.createElement('script');
+  tsScript.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=tsReady';
+  tsScript.async = true;
+  document.head.appendChild(tsScript);
+}
+function tsReset() {
+  tsToken = '';
+  if (tsWidgetId !== null && window.turnstile) turnstile.reset(tsWidgetId);
+}
+
 // Read ?redirect= param for post-login redirect to sub-projects
 var redirectUrl = '';
 (function() {
@@ -85,12 +110,15 @@ function sendCode() {
   var email = document.getElementById('email').value.trim();
   if (!email) { showMsg('msg-email', 'Please enter your email.', true); return; }
 
+  if (tsSiteKey && !tsToken) { showMsg('msg-email', 'Please wait for the human check to finish.', true); return; }
+
   var btn = document.getElementById('btn-email');
   btn.disabled = true;
   showMsg('msg-email', '');
 
   var payload = { email: email };
   if (redirectUrl) payload.redirect = redirectUrl;
+  if (tsToken) payload.turnstileToken = tsToken;
 
   fetch('/api/login', {
     method: 'POST',
@@ -109,7 +137,7 @@ function sendCode() {
     }
   })
   .catch(function() { showMsg('msg-email', 'Network error.', true); })
-  .finally(function() { btn.disabled = false; });
+  .finally(function() { btn.disabled = false; tsReset(); });
 }
 
 function verifyCode() {

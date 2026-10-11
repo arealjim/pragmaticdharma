@@ -1,7 +1,7 @@
-// /api/logout method contract. POST is the canonical form. GET is DEPRECATED
-// but deliberately retained: the shared nav-bar "Sign out" is a plain <a href>
-// (GET) baked into every deployed sub-project worker — see the router comment
-// in worker.js. If GET is ever removed, this file is the test to flip.
+// /api/logout method contract (2026-10-11): only POST signs out. GET changes
+// nothing — it serves a one-button confirm page that POSTs back — because
+// sub-project nav bars still link here with a plain <a href>. See the router
+// comment in worker.js.
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -37,12 +37,20 @@ test('POST /api/logout revokes the session and clears the cookie', async () => {
   assert.equal(await verifyJWT(env, jwt), null, 'JWT dead after POST logout');
 });
 
-test('GET /api/logout still works (deprecated, load-bearing for nav-bar <a href>)', async () => {
+test('GET /api/logout does not sign out: it serves the confirm page', async () => {
   const jwt = await mintSessionJwt();
   const resp = await worker.fetch(
     new Request(`${ORIGIN}/api/logout`, { headers: { Cookie: `pd_session=${jwt}` } }),
     env
   );
-  assert.equal(resp.status, 302, 'GET must keep working until every sibling nav bar POSTs');
-  assert.equal(await verifyJWT(env, jwt), null, 'JWT dead after GET logout');
+  assert.equal(resp.status, 200);
+  assert.match(resp.headers.get('content-type'), /text\/html/);
+  assert.equal(resp.headers.get('set-cookie'), null, 'GET must not clear the cookie');
+  assert.ok(await verifyJWT(env, jwt), 'session still alive after GET (logout-CSRF closed)');
+});
+
+test('GET /api/logout with no session just goes home', async () => {
+  const resp = await worker.fetch(new Request(`${ORIGIN}/api/logout`), env);
+  assert.equal(resp.status, 302);
+  assert.equal(resp.headers.get('location'), `${ORIGIN}/`);
 });

@@ -55,7 +55,7 @@ test('logout revokes the hashed session row and kills the JWT', async () => {
   const jwt = getCookie(login);
   assert.ok(await verifyJWT(env, jwt));
 
-  const logout = await worker.fetch(new Request(`${ORIGIN}/api/logout`, { headers: { Cookie: `pd_session=${jwt}` } }), env);
+  const logout = await worker.fetch(new Request(`${ORIGIN}/api/logout`, { method: 'POST', headers: { Cookie: `pd_session=${jwt}` } }), env);
   assert.equal(logout.status, 302);
 
   const row = env.DB._sqlite.prepare('SELECT revoked_at FROM sessions').get();
@@ -83,7 +83,7 @@ test('legacy raw session row still verifies and can be revoked (pre-deploy fallb
 
   assert.ok(await verifyJWT(env, jwt), 'legacy raw session row accepted');
 
-  const logout = await worker.fetch(new Request(`${ORIGIN}/api/logout`, { headers: { Cookie: `pd_session=${jwt}` } }), env);
+  const logout = await worker.fetch(new Request(`${ORIGIN}/api/logout`, { method: 'POST', headers: { Cookie: `pd_session=${jwt}` } }), env);
   assert.equal(logout.status, 302);
   const row = env.DB._sqlite.prepare('SELECT revoked_at FROM sessions WHERE token = ?').get(raw);
   assert.ok(row.revoked_at, 'legacy row revoked');

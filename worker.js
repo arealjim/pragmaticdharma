@@ -28,6 +28,7 @@ import SIGNUP_HTML from './pages/signup.html';
 import RESOURCES_HTML from './pages/resources.html';
 import ADMIN_HTML from './pages/admin.html';
 import RETREATS_HTML from './pages/retreats.html';
+import LOGOUT_HTML from './pages/logout.html';
 import NAV_BAR_HTML from './shared/nav-bar.html';
 // Served verbatim at GET /pd-sso.js. Stored as .txt so wrangler's built-in
 // Text module rule (**/*.txt) bundles it as a string without the .js ESM
@@ -249,12 +250,10 @@ export default {
         }
 
         if (loopGuard) {
-          const headers = new Headers(HTML_HEADERS);
-          headers.append('Set-Cookie', 'pd_lr=; Path=/login; Max-Age=0; Secure; HttpOnly; SameSite=Lax');
-          return new Response(LOGIN_HTML, { headers });
+          return loginPageResponse(env, ['pd_lr=; Path=/login; Max-Age=0; Secure; HttpOnly; SameSite=Lax']);
         }
 
-        return htmlResponse(LOGIN_HTML);
+        return loginPageResponse(env);
       }
       if (method === 'GET' && path === '/signup') {
         return htmlResponse(SIGNUP_HTML);
@@ -284,17 +283,14 @@ export default {
       if (method === 'GET' && path === '/api/refresh-session') {
         return handleRefreshSession(request, env);
       }
-      // DEPRECATED but load-bearing: GET /api/logout mutates state (revokes the
-      // session row), which in principle belongs on POST only. It CANNOT be
-      // removed yet — the shared nav-bar "Sign out" is a plain <a href> (GET)
-      // baked into every deployed sub-project worker (astrology, discern,
-      // ego-assessment, psychic-shield, mind-reader, majordomo review-app, and
-      // this worker's own shared/nav-bar.html). Removing GET before every
-      // sibling re-vendors a POSTing nav bar would break Sign out fleet-wide.
-      // Worst case for keeping it: a third page can force a logout (nuisance,
-      // no data exposure). New callers must use POST.
+      // Logout is POST-only. GET /api/logout changes nothing: it shows a
+      // one-button "Sign out?" page that POSTs back here, so a link or <img>
+      // on another site can't force a logout (logout-CSRF). The GET route
+      // stays because sub-project nav bars vendored before 2026-10-11 still
+      // link here with a plain <a href> — they get one extra click, not a 404.
       if (method === 'GET' && path === '/api/logout') {
-        return handleLogout(request, env);
+        if (!getJWTFromCookie(request)) return Response.redirect(`${url.origin}/`, 302);
+        return htmlResponse(LOGOUT_HTML);
       }
       if (method === 'POST' && path === '/api/logout') {
         return handleLogout(request, env);
@@ -452,6 +448,14 @@ async function handleLogin(request, env) {
   const email = (body.email || '').trim().toLowerCase();
   if (!email || !email.includes('@')) {
     return jsonResponse({ error: 'Valid email is required' }, 400);
+  }
+
+  // Bot check before any DB work or email send. Inert until both Turnstile
+  // secrets are set (see turnstileConfig).
+  const turnstile = await turnstileConfig(env);
+  if (turnstile && !(await verifyTurnstile(turnstile.secret, body.turnstileToken,
+                                           request.headers.get('CF-Connecting-IP')))) {
+    return jsonResponse({ error: 'Could not confirm you are human. Reload the page and try again.' }, 403);
   }
 
   // L2: rate-limit by IP BEFORE looking up the user, so the 429 vs. 403
@@ -1383,6 +1387,57 @@ function formatLocation(geo) {
 async function getConfig(env, key) {
   const row = await env.DB.prepare('SELECT value FROM config WHERE key = ?').bind(key).first();
   return row ? row.value : null;
+}
+
+// =========================================================================
+// TURNSTILE (bot check on /api/login)
+// =========================================================================
+
+// Both TURNSTILE_SITE_KEY (public, rendered into login.html) and
+// TURNSTILE_SECRET must be set, as worker secrets, for the check to run.
+// Unset = skipped (pre-2026-10-11 behaviour). Half-set = skipped and logged:
+// a secret without a site key would reject every login, since the page would
+// render no widget. The widget is the hub's own, never psyche's: psyche is
+// isolated on purpose (AUTH-DESIGN.md Tier 2).
+async function turnstileConfig(env) {
+  const siteKey = await getSecret(env, 'TURNSTILE_SITE_KEY');
+  const secret = await getSecret(env, 'TURNSTILE_SECRET');
+  if (siteKey && secret) return { siteKey, secret };
+  if (siteKey || secret) console.error('turnstile half-configured: need both TURNSTILE_SITE_KEY and TURNSTILE_SECRET; skipping the check');
+  return null;
+}
+
+// Fails closed: no token, a network error or a 5 s timeout all count as "not human".
+async function verifyTurnstile(secret, token, ip) {
+  if (!token || typeof token !== 'string') return false;
+  try {
+    const resp = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ secret, response: token, remoteip: ip || undefined }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!resp.ok) return false;
+    const data = await resp.json();
+    return data.success === true;
+  } catch {
+    return false;
+  }
+}
+
+// login.html carries a {{TURNSTILE_SITE_KEY}} placeholder; empty = no widget.
+// With a widget, the page's CSP must also admit Cloudflare's script + iframe.
+async function loginPageResponse(env, extraCookies = []) {
+  const turnstile = await turnstileConfig(env);
+  const headers = new Headers(HTML_HEADERS);
+  if (turnstile) {
+    headers.set('content-security-policy', CSP_HEADER
+      .replace("script-src 'self' 'unsafe-inline'", "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com")
+      + '; frame-src https://challenges.cloudflare.com');
+  }
+  for (const c of extraCookies) headers.append('Set-Cookie', c);
+  const html = LOGIN_HTML.replace('{{TURNSTILE_SITE_KEY}}', turnstile ? turnstile.siteKey : '');
+  return new Response(html, { headers });
 }
 
 // =========================================================================

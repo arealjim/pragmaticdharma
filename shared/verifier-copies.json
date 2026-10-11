@@ -1,0 +1,28 @@
+{
+  "_doc": "Where each relying party keeps its copy of the canonical verifier (shared/auth-cloudflare.js). Read by scripts/auth-drift.mjs. Keyed by registry key (projects.config.mjs). Only projects whose host resolves are checked, so an offline app needs no row until it is restored, and a restored app with no row goes red. 'deviations' records a function that differs from canonical ON PURPOSE: the normalized sha256 it is expected to have, and why. Any other difference is drift. Rows: AUTH-DESIGN.md weakness #2.",
+  "functions": ["verifyJWT", "base64urlDecode", "hasProjectAccess"],
+  "copies": {
+    "shield": {
+      "repo": "psychic-shield",
+      "file": "deploy/worker.js"
+    },
+    "sentinel": {
+      "repo": "sentinel-web",
+      "file": "functions/_middleware.js"
+    },
+    "review": {
+      "repo": "majordomo",
+      "file": "review-app/worker.js",
+      "deviations": {
+        "hasProjectAccess": {
+          "sha256": "c18f71f1698501906f3d827db9c1c3e99b0967aac79142487a02afb45a3fe50a",
+          "why": "review is sensitive: a JWT with no projects claim is denied (canonical treats a missing claim as legacy full access)"
+        }
+      }
+    },
+    "boardreview": {
+      "sameAs": "review",
+      "why": "served by the same majordomo review-app worker as review (host-keyed behaviour)"
+    }
+  }
+}

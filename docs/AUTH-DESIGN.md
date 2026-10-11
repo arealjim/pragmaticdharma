@@ -82,7 +82,7 @@ doc's proposal reached Jim, which is why the doc read as if it were still open.*
      links already vendored into sub-project nav bars keep working, at the cost
      of one extra click, so no sub-app had to be redeployed.
    - **Turnstile on `/api/login`**, using the Hub's own widget and never
-     psyche's. It stays inert until the worker has both `TURNSTILE_SITE_KEY`
+     psyche's (widget `pd-hub`, live since 2026-10-11). It stays inert until the worker has both `TURNSTILE_SITE_KEY`
      and `TURNSTILE_SECRET`. Once both are set it fails closed: no token, a bad
      token or a siteverify outage all mean no email goes out. The login page's
      CSP admits `challenges.cloudflare.com` only while it is configured.

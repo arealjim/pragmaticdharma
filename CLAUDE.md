@@ -78,7 +78,7 @@ All platform secrets live in **Cloudflare Secrets Store** under store name `prag
 
 **Other shared secrets:** `OWNER_EMAIL`.
 
-**Turnstile (hub login bot check, built 2026-10-11, inert until set):** plain worker secrets `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET` on `pragmaticdharma` (`wrangler secret put`). Both or neither: with only one set the check is skipped and logged. The widget must be the hub's own, **never psyche's** (psyche is isolated on purpose). Once both are set the check fails closed.
+**Turnstile (hub login bot check, LIVE since 2026-10-11 23:08):** widget `pd-hub` (Managed, hostname pragmaticdharma.org), keys in vault `cto/pd-hub-turnstile` (UserName = site key, Password = secret). Plain worker secrets `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET` on `pragmaticdharma` (`wrangler secret put`). Both or neither: with only one set the check is skipped and logged. The widget must be the hub's own, **never psyche's** (psyche is isolated on purpose). Once both are set the check fails closed.
 
 **Per-service plain Worker secrets** (still on `wrangler secret put` until next rotation): `DISCORD_WEBHOOK_URL` on `pragmaticdharma` (signup notifications + retention-sweep alerts). `RESEND_API_KEY` was migrated to Secrets Store on 2026-04-25 as `PRAGMATICDHARMA_RESEND_API_KEY`. Code reads via `getSecret(env, name)` which handles both binding types transparently.
 

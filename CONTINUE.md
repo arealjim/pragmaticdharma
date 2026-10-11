@@ -7,7 +7,7 @@ _Updated: 2026-10-11_
 **2026-10-11: auth fixes #2 + #3 shipped (Jim's yes on spine ak-0a3b0a83; line ln-deca350c).** The hub is deployed at version `2273cf3d`.
 - Drift-check: `scripts/auth-drift.mjs` + `shared/verifier-copies.json`, running as the fleet-health invariant "pd auth: verifier drift". It is green: shield, sentinel and review/boardreview match, and 8 offline apps are skipped.
 - `GET /api/logout` serves a POST confirm page and no longer signs out. POST is the only way to sign out.
-- Turnstile on `/api/login` is built but inert, waiting on a hub-only widget (an ask on the spine) and the two worker secrets.
+- Turnstile on `/api/login` has been **live since 23:08**. The widget is `pd-hub` and the keys are in vault `cto/pd-hub-turnstile`. A real login passed end to end, and requests with no token or a bogus one get 403.
 - AUTH-DESIGN.md is corrected: fix #1 (24h JWT) has been live since 07-19. The **two-tier policy and "which pd services stay up" belong to a sit-down with Jim (ak-7072af98)**, so don't build on either until it happens.
 - Post-deploy smoke: the 4 live relying parties 302 to login exactly as before, hub `/`, `/login` 200, GET logout with a cookie shows the confirm page, and POST clears the cookie. 90/90 unit tests.
 

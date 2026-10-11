@@ -51,36 +51,57 @@ else gets its own auth. Never "unify" psyche into the Hub for convenience.
 
 ## The three real weaknesses (and the fixes)
 
-1. **Revocation doesn't propagate.** Relying parties trust an unexpired JWT
-   for up to 30 days; Hub-side logout/revocation only stops the Hub itself.
-   **Fix (build):** shorten the JWT `exp` to ~24 h while keeping the 30-day
-   Hub session. An expired JWT already triggers the refresh-session bounce,
-   which re-checks `revoked_at` + user status at the Hub — so revocation
-   becomes effective within a day, with no new infrastructure and no per-app
-   Hub callbacks. Users still stay logged in for 30 days.
+*Status as of 2026-10-11. Weakness 1 was fixed on 2026-07-19, before this
+doc's proposal reached Jim, which is why the doc read as if it were still open.*
+
+1. **Revocation doesn't propagate.** **FIXED 2026-07-19.** The JWT `exp` is
+   24 h (`JWT_TTL_SECONDS = 86400`), the Hub session stays 30 days, and an
+   expired JWT is silently re-minted at `/login` (`verifyJWTForRefresh` →
+   `handleRefreshSession`), which re-checks `revoked_at` and the user's status.
+   Revocation therefore lands within a day, with no new magic-link email.
+   Design: `docs/design-session-revocation.md`.
 
 2. **Verifier drift.** Workers can't share code across deployments, so every
-   app keeps its own *copy* of the canonical verifier, and copies drift.
-   **Fix (build):** stamp `AUTH_VERSION` in the canonical files and add a
-   small check script (runnable by CI or the fleet-health report) that hashes
-   each app's copy against canonical and goes red on mismatch.
+   app inlines its own copy of the canonical verifier, and copies drift.
+   **BUILT 2026-10-11:** `scripts/auth-drift.mjs` extracts `verifyJWT`,
+   `base64urlDecode` and `hasProjectAccess` from each relying party's committed
+   code (its bare repo on biggie), normalizes away formatting, and hashes each
+   against `shared/auth-cloudflare.js`. Which apps it checks is derived: a
+   registry project whose host resolves is live, and offline apps are skipped.
+   `shared/verifier-copies.json` says where each app's copy lives and records
+   deliberate deviations (review requires an explicit project grant). A live
+   app with no row there fails, so a restored app is noticed. It shows up as
+   the fleet-health invariant **"pd auth: verifier drift"**, which surfaces a
+   failure and never blocks a deploy. It checks committed code, not the
+   deployed bundle.
 
-3. **Hub hygiene.** `GET /api/logout` mutates state (logout-CSRF), no bot
-   protection on `/api/login`, dead code, and thin test coverage on
-   signup/admin/refresh paths — all already itemized in `TODO.md ## Later`.
-   **Fix (build):** one batched hardening pass.
+3. **Hub hygiene.** **DONE**, in two passes. 2026-07-30 added the tests
+   (signup/admin/refresh/redirect) and removed the dead code. 2026-10-11 added:
+   - **POST-only logout.** `GET /api/logout` signs nobody out. It serves a
+     one-button "Sign out?" page that POSTs, which closes logout-CSRF. Sign-out
+     links already vendored into sub-project nav bars keep working, at the cost
+     of one extra click, so no sub-app had to be redeployed.
+   - **Turnstile on `/api/login`**, using the Hub's own widget and never
+     psyche's. It stays inert until the worker has both `TURNSTILE_SITE_KEY`
+     and `TURNSTILE_SECRET`. Once both are set it fails closed: no token, a bad
+     token or a siteverify outage all mean no email goes out. The login page's
+     CSP admits `challenges.cloudflare.com` only while it is configured.
 
 ## What this design deliberately does NOT do
 
 - No third-party identity provider, no OAuth — magic-link fits a
   tens-of-users platform and keeps the whole system explainable in a page.
-- No shared session store for relying parties — local JWT verification is why
-  apps stay simple and fast; the 24-hour exp makes it safe enough.
+- No shared session store for relying parties. Local JWT verification is why
+  the apps stay simple and fast, and the 24-hour exp makes that safe enough.
 - No auth changes to ego-assessment (frozen legacy) or psyche (isolation is
   the point).
 
 ## Decision status
 
-Proposed to Jim via the cto review board (2026-07-17): adopt the two-tier
-policy (this doc), build fix #1 (short-lived JWT), build fixes #2+#3 (drift
-check + hardening batch). Update this section when decided.
+- **Fixes #2 + #3:** approved by Jim 2026-10-11 (spine ak-0a3b0a83), built
+  and deployed the same day (hub version `2273cf3d`).
+- **Fix #1:** already live since 2026-07-19 (see above).
+- **The two-tier policy (Tier 1 / Tier 2 above):** NOT adopted yet. Jim folded
+  it into a sit-down on which pd services are being kept (spine ak-7072af98).
+  Until that sit-down, the tier sections describe how things are today and are
+  not yet a standing rule.

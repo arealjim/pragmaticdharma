@@ -78,6 +78,8 @@ All platform secrets live in **Cloudflare Secrets Store** under store name `prag
 
 **Other shared secrets:** `OWNER_EMAIL`.
 
+**Turnstile (hub login bot check, built 2026-10-11, inert until set):** plain worker secrets `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET` on `pragmaticdharma` (`wrangler secret put`). Both or neither: with only one set the check is skipped and logged. The widget must be the hub's own, **never psyche's** (psyche is isolated on purpose). Once both are set the check fails closed.
+
 **Per-service plain Worker secrets** (still on `wrangler secret put` until next rotation): `DISCORD_WEBHOOK_URL` on `pragmaticdharma` (signup notifications + retention-sweep alerts). `RESEND_API_KEY` was migrated to Secrets Store on 2026-04-25 as `PRAGMATICDHARMA_RESEND_API_KEY`. Code reads via `getSecret(env, name)` which handles both binding types transparently.
 
 ⚠️ Platform Worker `compatibility_date` must be `2026-04-01` or later for Secrets Store bindings to work — older dates break `.get()`.
@@ -107,7 +109,7 @@ reviews/
 
 ## Testing
 
-**Unit tests** (local, no network): `npm test` — runs `test/*.test.mjs` under `node --test` against the real worker fetch handler, with an in-memory D1 (node:sqlite adapter, `test/fake-d1.mjs`) and stubbed outbound fetch. Loader hooks in `test/register-stubs.mjs` stub the wrangler text-module imports. Covers: magic-link/code verify (atomic single-use), token hash-at-rest, logout revocation (POST + deprecated GET), retention sweep, session-revocation/lazy-refresh, signup (rate limits, rejected-user cooldown, open-beta auto-approval), admin API (CSRF guard, authz, approve/reject, config allowlist, `GET /api/admin/projects`), refresh-session, `validateRedirectUrl`, the registry derivations, the registry-rendered index cards (byte-compared against the pre-v2 static markup), and the `wrangler.toml` codegen (`scripts/gen-wrangler.mjs`).
+**Unit tests** (local, no network): `npm test` — runs `test/*.test.mjs` under `node --test` against the real worker fetch handler, with an in-memory D1 (node:sqlite adapter, `test/fake-d1.mjs`) and stubbed outbound fetch. Loader hooks in `test/register-stubs.mjs` stub the wrangler text-module imports. Covers: magic-link/code verify (atomic single-use), token hash-at-rest, logout (POST revokes; GET only serves the confirm page), Turnstile on `/api/login` (off / half-set / pass / fail / outage / CSP), the verifier drift-check's extract+normalize (`scripts/auth-drift.mjs`), retention sweep, session-revocation/lazy-refresh, signup (rate limits, rejected-user cooldown, open-beta auto-approval), admin API (CSRF guard, authz, approve/reject, config allowlist, `GET /api/admin/projects`), refresh-session, `validateRedirectUrl`, the registry derivations, the registry-rendered index cards (byte-compared against the pre-v2 static markup), and the `wrangler.toml` codegen (`scripts/gen-wrangler.mjs`).
 
 **Integration tests** (live): `test-auth.js`'s generic matrix (`sites`) and required JWT keys are generated from the registry (`testMatrixProjects()` — every project except `review`/`boardreview`/`sentinel`, which have `customAuthTest: true` and their own hand-written policy tests below them in the file, since they're gated by their own sub-worker's admin-role/email-allowlist logic beyond what the platform's JWT `projects` claim can express).
 
@@ -125,6 +127,8 @@ Tests 7 scenarios × the registry's non-custom-auth-test project count (9 as of 
 Two auth styles are tested — which one applies to a project is its `gate` field in `projects.config.mjs`:
 - **worker-gate** (shield, mindreader, psychtools, discern, practice, astrology, bromnichord — plus sentinel/review/boardreview, tested separately, custom policy): unauthenticated → 302 redirect, wrong project → 302 to `/api/refresh-session` (re-issues JWT), then 403 if still denied. Tests accept either 302 or 403 for the project-denied case.
 - **api-gate** (ego-assessment, health): all auth failures → 401 (project-denied = unauthenticated at API level)
+
+**Verifier drift-check:** `scripts/auth-drift.mjs` hashes each LIVE relying party's inlined copy of the verifier against `shared/auth-cloudflare.js` (map + deliberate deviations: `shared/verifier-copies.json`). It runs as the fleet-health invariant "pd auth: verifier drift" on biggie. When you restore an offline app, or change a relying party's verifier on purpose, update `verifier-copies.json` (`node scripts/auth-drift.mjs --hash <fn>` prints the hashes).
 
 ## Code Conventions
 

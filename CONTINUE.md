@@ -1,9 +1,17 @@
 # Continue
 
-_Updated: 2026-08-23_
+_Updated: 2026-10-11_
 
 ## State
 
+**2026-10-11: auth fixes #2 + #3 shipped (Jim's yes on spine ak-0a3b0a83; line ln-deca350c).** The hub is deployed at version `2273cf3d`.
+- Drift-check: `scripts/auth-drift.mjs` + `shared/verifier-copies.json`, running as the fleet-health invariant "pd auth: verifier drift". It is green: shield, sentinel and review/boardreview match, and 8 offline apps are skipped.
+- `GET /api/logout` serves a POST confirm page and no longer signs out. POST is the only way to sign out.
+- Turnstile on `/api/login` is built but inert, waiting on a hub-only widget (an ask on the spine) and the two worker secrets.
+- AUTH-DESIGN.md is corrected: fix #1 (24h JWT) has been live since 07-19. The **two-tier policy and "which pd services stay up" belong to a sit-down with Jim (ak-7072af98)**, so don't build on either until it happens.
+- Post-deploy smoke: the 4 live relying parties 302 to login exactly as before, hub `/`, `/login` 200, GET logout with a cookie shows the confirm page, and POST clears the cookie. 90/90 unit tests.
+
+**Earlier (2026-08-23):** 
 **2026-08-23: v2 registry-driven rewrite Slices 2-4 — DEPLOYED.** This session had Cloudflare Secrets Store access (confirmed via `wrangler whoami`). `npm run deploy` succeeded — predeploy codegen reported `wrangler.toml` already up to date, `wrangler deploy` uploaded cleanly. Live version `6671728e-b555-438f-8102-ff3f3665bd97`.
 
 Smoke checks, all green:
